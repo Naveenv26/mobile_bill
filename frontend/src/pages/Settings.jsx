@@ -1,161 +1,193 @@
-// frontend/src/pages/Settings.jsx
 import React, { useState, useEffect } from "react";
-import axios from "../api/axios"; // your base axios instance with JWT token
-import { toast } from "react-hot-toast";
+import axios from "../api/axios";
+
+// --- Sub-Components ---
+import ProfileSettings from "./settings/ProfileSettings";
+import InvoiceSettings from "./settings/InvoiceSettings";
+import InventorySettings from "./settings/InventorySettings";
+import UserSettings from "./settings/UserSettings";
+import TaxSettings from "./settings/TaxSettings";
+import NotificationSettings from "./settings/NotificationSettings";
+import CustomerSettings from "./settings/CustomerSettings";
+import FeedbackSettings from "./settings/FeedbackSettings";
+
+// --- ICONS ---
+// Simple consistent icons for the list
+const Icons = {
+  Profile: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+  Invoice: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+  Inventory: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
+  Users: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  Tax: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  Report: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+  Customer: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
+  Feedback: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
+  ChevronRight: () => <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+  ArrowLeft: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
+};
 
 export default function Settings() {
-  const [loading, setLoading] = useState(true);
-  const [shop, setShop] = useState(null); // This will hold the full shop object
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({});
-  const [subscription, setSubscription] = useState(null); // Keep this for subscription info
+  // On mobile, 'activeTab' is null initially (showing the list).
+  // On desktop, 'activeTab' defaults to 'profile'.
+  const [activeTab, setActiveTab] = useState(null);
+  const [shopData, setShopData] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
+  // Detect screen size changes
   useEffect(() => {
-    const fetchData = async () => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // If switching to desktop and no tab selected, select profile
+      if (!mobile && !activeTab) setActiveTab("profile");
+    };
+    
+    // Initial check
+    handleResize();
+    
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [activeTab]);
+
+  // Fetch Data
+  useEffect(() => {
+    const fetchShop = async () => {
       try {
-        // --- UPDATED: Fetch from /me/ endpoint ---
-        const meRes = await axios.get("/me/");
-        const { shop: shopData } = meRes.data;
-
-        if (shopData) {
-          setShop(shopData);
-          setForm(shopData); // Pre-fill the form with shop data
-        } else {
-          toast.error("No shop data found for this user.");
-        }
-
-        // You can still fetch subscription plans separately
-        const subRes = await axios.get("/subscription-plans/"); // This seems to be for all plans
-        // You might want to filter this or get the user's specific plan
-        setSubscription(subRes.data[0]); // (Kept original logic)
-
-      } catch (error) {
-        toast.error("Failed to load settings");
-        console.error(error);
-      } finally {
-        setLoading(false);
+        const res = await axios.get("/me/");
+        setShopData(res.data.shop);
+      } catch (err) {
+        console.error(err);
       }
     };
-    fetchData();
+    fetchShop();
   }, []);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const tabs = [
+    { id: "profile", label: "Shop Profile", desc: "Name, Address, Logo", icon: <Icons.Profile /> },
+    { id: "invoice", label: "Invoice & Billing", desc: "Print size, Prefixes", icon: <Icons.Invoice /> },
+    { id: "inventory", label: "Inventory Rules", desc: "Units, Thresholds", icon: <Icons.Inventory /> },
+    { id: "users", label: "Staff & Roles", desc: "Manage access", icon: <Icons.Users /> },
+    { id: "tax", label: "Tax & Currency", desc: "GST, Symbols", icon: <Icons.Tax /> },
+    { id: "reports", label: "Daily Reports", desc: "Email summaries", icon: <Icons.Report /> },
+    { id: "customers", label: "Customers", desc: "Defaults, Credits", icon: <Icons.Customer /> },
+    { id: "feedback", label: "Feedback", desc: "Rate us", icon: <Icons.Feedback /> },
+  ];
 
-  const handleSave = async () => {
-    if (!shop || !shop.id) {
-      toast.error("Cannot save: Shop ID is missing.");
-      return;
-    }
-
-    try {
-      // --- UPDATED: Use the correct endpoint with shop ID ---
-      // The backend ShopViewSet is filtered, so this request is secure
-      const res = await axios.put(`/shops/${shop.id}/`, form);
-      
-      setShop(res.data);
-      setForm(res.data); // Update form with new data
-      setEditing(false);
-      
-      // --- UPDATE localStorage to match ---
-      localStorage.setItem("shop", JSON.stringify(res.data));
-      // Optionally, force a window reload or update Layout's state
-      // to show the new name immediately in the sidebar.
-      window.location.reload(); // Easiest way to update sidebar name
-      
-      toast.success("Shop details updated!");
-    } catch (err) {
-      toast.error("Failed to update shop details");
-      console.error(err);
+  const renderContent = () => {
+    switch (activeTab) {
+      case "profile": return <ProfileSettings shop={shopData} />;
+      case "invoice": return <InvoiceSettings shop={shopData} />;
+      case "inventory": return <InventorySettings />;
+      case "users": return <UserSettings />;
+      case "tax": return <TaxSettings />;
+      case "reports": return <NotificationSettings />;
+      case "customers": return <CustomerSettings />;
+      case "feedback": return <FeedbackSettings />;
+      default: return null;
     }
   };
 
-  if (loading) return <div className="p-6 text-gray-400">Loading settings...</div>;
-
-  return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">⚙️ Settings</h1>
-
-      {/* Shop Details */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow">
-        <h2 className="text-xl font-semibold mb-4">Shop Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Made responsive */}
-          <input
-            name="name"
-            value={form.name || ""}
-            onChange={handleChange}
-            placeholder="Shop Name"
-            disabled={!editing}
-            className="border p-2 rounded disabled:bg-gray-100" // Added disabled style
-          />
-          <input
-            name="address"
-            value={form.address || ""}
-            onChange={handleChange}
-            placeholder="Address"
-            disabled={!editing}
-            className="border p-2 rounded disabled:bg-gray-100"
-          />
-          {/* Example: Add other fields from your Shop model */}
-          <input
-            name="contact_phone"
-            value={form.contact_phone || ""}
-            onChange={handleChange}
-            placeholder="Contact Phone"
-            disabled={!editing}
-            className="border p-2 rounded disabled:bg-gray-100"
-          />
-           <input
-            name="contact_email"
-            value={form.contact_email || ""}
-            onChange={handleChange}
-            placeholder="Contact Email"
-            disabled={!editing}
-            className="border p-2 rounded disabled:bg-gray-100"
-          />
-          <input
-            name="gst_number"
-            value={form.gst_number || ""}
-            onChange={handleChange}
-            placeholder="GST Number (if any)"
-            disabled={!editing}
-            className="border p-2 rounded disabled:bg-gray-100"
-          />
-        </div>
-
-        {editing ? (
-          <div className="mt-4 flex gap-3">
-            <button
-              onClick={handleSave}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => {
-                setEditing(false);
-                setForm(shop); // Reset form changes
-              }}
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg"
-            >
-              Cancel
-            </button>
+  // --- MOBILE VIEW LOGIC ---
+  if (isMobile) {
+    // VIEW 1: SETTINGS LIST (Main Menu)
+    if (!activeTab) {
+      return (
+        <div className="min-h-screen bg-slate-50">
+          <div className="bg-white px-4 py-4 border-b border-slate-200 sticky top-0 z-10">
+            <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
           </div>
-        ) : (
-          <button
-            onClick={() => setEditing(true)}
-            className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg"
-          >
-            Edit Shop
-          </button>
-        )}
-      </div>
+          <div className="divide-y divide-slate-100 bg-white mt-2 border-t border-b border-slate-200">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="w-full flex items-center justify-between p-4 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="text-slate-500">{tab.icon}</div>
+                  <div>
+                    <div className="text-base font-medium text-slate-900">{tab.label}</div>
+                    <div className="text-xs text-slate-500">{tab.desc}</div>
+                  </div>
+                </div>
+                <Icons.ChevronRight />
+              </button>
+            ))}
+          </div>
+          <div className="p-4 text-center text-xs text-slate-400 mt-4">
+            Version 1.0.0 • Build 2025
+          </div>
+        </div>
+      );
+    }
 
-      {/* Subscription Info */}
-      {/* ... (no change needed here, but ensure your logic for finding the
-           'active' subscription is correct instead of subRes.data[0]) ... */}
-      
+    // VIEW 2: CONTENT DETAIL (Specific Setting)
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        {/* Mobile Header with Back Button */}
+        <div className="bg-white px-4 py-3 border-b border-slate-200 sticky top-0 z-20 flex items-center gap-3 shadow-sm">
+          <button 
+            onClick={() => setActiveTab(null)} 
+            className="p-1 -ml-2 rounded-full hover:bg-slate-100 text-slate-600"
+          >
+            <Icons.ArrowLeft />
+          </button>
+          <h2 className="text-lg font-bold text-slate-900 truncate">
+            {tabs.find(t => t.id === activeTab)?.label}
+          </h2>
+        </div>
+        
+        {/* Content Body */}
+        <div className="flex-1 p-4 overflow-y-auto">
+          {renderContent()}
+        </div>
+      </div>
+    );
+  }
+
+  // --- DESKTOP VIEW LOGIC (Side-by-Side) ---
+  return (
+    <div className="flex h-[calc(100vh-64px)] bg-slate-50 font-sans text-slate-800">
+      {/* Sidebar */}
+      <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm z-10 overflow-y-auto">
+        <div className="p-6 border-b border-slate-100">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Settings</h2>
+            <p className="text-xs text-slate-500 mt-1">Manage your workspace</p>
+        </div>
+        <nav className="flex-1 p-3 space-y-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                activeTab === tab.id
+                  ? "bg-sky-50 text-sky-700 border border-sky-100 shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              <span className={`mr-3 ${activeTab === tab.id ? "text-sky-500" : "text-slate-400"}`}>
+                {tab.icon}
+              </span>
+              <div className="text-left">
+                <div>{tab.label}</div>
+              </div>
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Content Area */}
+      <main className="flex-1 overflow-y-auto p-10">
+        <div className="max-w-3xl mx-auto">
+            <div className="mb-8 pb-4 border-b border-slate-200">
+                <h1 className="text-3xl font-bold text-slate-900">{tabs.find(t => t.id === activeTab)?.label}</h1>
+                <p className="text-slate-500 mt-1">{tabs.find(t => t.id === activeTab)?.desc}</p>
+            </div>
+            
+            {/* Render the selected component */}
+            {renderContent()}
+        </div>
+      </main>
     </div>
   );
 }

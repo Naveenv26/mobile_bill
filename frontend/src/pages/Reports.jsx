@@ -1,492 +1,380 @@
-import React, { useState, useEffect, useMemo } from "react";
-// --- FIX: Corrected import paths with extensions ---
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getInvoices } from "../api/invoices.js";
 import { getProducts } from "../api/products.js";
-import { useSubscription } from "../context/SubscriptionContext.jsx"; // Import the hook
-// --------------------------------------------------
+import { useSubscription } from "../context/SubscriptionContext.jsx";
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import * as XLSX from 'xlsx'; // Import xlsx
+// --- Charts ---
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-// A custom hook to check for media queries (screen size)
-const useMediaQuery = (query) => {
-    const [matches, setMatches] = useState(false);
-    useEffect(() => {
-        const media = window.matchMedia(query);
-        if (media.matches !== matches) setMatches(media.matches);
-        const listener = () => setMatches(media.matches);
-        window.addEventListener("resize", listener);
-        return () => window.removeEventListener("resize", listener);
-    }, [matches, query]);
-    return matches;
-};
+// --- Icons ---
+const DownloadIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+const CalendarIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+const SearchIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
+const CloseIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
 
-// Reusable component to handle the mobile card vs. desktop table logic
-const ResponsiveDataView = ({ isMobile, data, renderMobile, renderDesktop, noDataMessage }) => {
-    if (!data || data.length === 0) {
-        return <p className="text-center p-4 text-gray-500">{noDataMessage}</p>;
-    }
-    return isMobile ? (
-        <div className="space-y-3">{data.map(renderMobile)}</div>
-    ) : (
-        <div className="overflow-x-auto rounded shadow border border-gray-200">
-            {renderDesktop()}
+// Specialized Icons
+const TrendingUpIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
+const CubeIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>;
+const StarIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>;
+const AlertIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+
+// --- Formatters ---
+const formatCurrency = (val) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(val || 0));
+const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
+
+// --- Components ---
+
+const StatCard = ({ title, value, subtext, icon, gradient, isDark }) => (
+    <div className={`relative overflow-hidden rounded-2xl p-5 shadow-lg min-w-[160px] ${gradient} ${isDark ? 'text-white' : 'text-slate-800'}`}>
+        <div className="relative z-10 flex flex-col h-full justify-between">
+            <div className="flex justify-between items-start mb-2">
+                <div className={`p-2 rounded-xl backdrop-blur-md border shadow-inner ${isDark ? 'bg-white/20 border-white/10' : 'bg-white/60 border-white/40'}`}>
+                    {icon}
+                </div>
+            </div>
+            <div>
+                <h3 className="text-2xl font-black tracking-tight">{value}</h3>
+                <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${isDark ? 'opacity-80' : 'opacity-60'}`}>{title}</p>
+                {subtext && <p className={`text-[10px] mt-2 w-fit px-2 py-0.5 rounded-lg ${isDark ? 'bg-white/20 opacity-90' : 'bg-slate-200/50 opacity-100 text-slate-700 font-bold'}`}>{subtext}</p>}
+            </div>
         </div>
-    );
-};
-
-// Stat Card component
-const StatCard = ({ title, value, color = "blue" }) => (
-    <div className={`bg-${color}-100 p-4 rounded-lg shadow`}>
-        <h3 className={`font-semibold text-sm text-${color}-700`}>{title}</h3>
-        <p className={`text-2xl font-bold text-${color}-900`}>{value}</p>
+        {/* Decorative Background Elements */}
+        <div className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full blur-xl pointer-events-none ${isDark ? 'bg-white/10' : 'bg-blue-200/20'}`}></div>
+        <div className={`absolute top-[-30px] right-[-10px] w-20 h-20 rounded-full blur-lg pointer-events-none ${isDark ? 'bg-white/5' : 'bg-blue-200/20'}`}></div>
     </div>
 );
 
-// Currency formatter
-const formatCurrency = (val) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(val || 0));
-
-// Text highlighter
-function highlightText(text = "", query = "") {
-    if (!query || typeof text !== "string") return text;
-    const regex = new RegExp(`(${query})`, "gi");
-    const parts = text.split(regex);
-    return parts.map((part, i) =>
-        regex.test(part) ? <mark key={i} className="bg-yellow-300 text-black rounded px-0.5">{part}</mark> : part
-    );
-}
-
-// --- Main Reports Component ---
 export default function Reports() {
-    // ... (all existing states remain the same)
     const [tab, setTab] = useState("sales");
     const [invoices, setInvoices] = useState([]);
     const [products, setProducts] = useState([]);
-    
-    // Filters
     const [fromDate, setFromDate] = useState("");
     const [toDate, setToDate] = useState("");
-    const [salesSearch, setSalesSearch] = useState("");
-    const [stockSearch, setStockSearch] = useState("");
-    const [productSearch, setProductSearch] = useState("");
+    const [search, setSearch] = useState("");
     
-    // UI State
     const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [showExportMenu, setShowExportMenu] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
 
-    const isMobile = useMediaQuery("(max-width: 640px)");
+    const { isSubscribed } = useSubscription();
+    const exportMenuRef = useRef(null);
 
-    // --- NEW: Get subscription data ---
-    // --- FIX: Use the subscription context correctly ---
-    const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription();
-    // Manually define canExport based on subscription status
-    const canExport = isSubscribed; 
-    // If you have a more granular `hasFeature` function in your context, you can use it:
-    // const { hasFeature } = useSubscription();
-    // const canExport = hasFeature('export');
+    // --- THEME CONFIGURATION ---
+    const themeColor = useMemo(() => {
+        if(tab === 'sales') return { hex: '#0A1A2F', bg: 'bg-blue-200', text: 'text-blue-900' }; 
+        if(tab === 'stock') return { hex: '#1E1B4B', bg: 'bg-indigo-200', text: 'text-indigo-900' }; 
+        return { hex: '#155E75', bg: 'bg-cyan-200', text: 'text-cyan-900' }; 
+    }, [tab]);
 
-    // ... (useEffect and Memoized calculations remain the same)
     useEffect(() => {
         const loadData = async () => {
+            setLoading(true);
             try {
-                setLoading(true);
-                setError(null);
-                const invRes = await getInvoices();
-                const prodRes = await getProducts();
-
-                const invoiceData = invRes?.data || invRes || [];
-                const productData = prodRes?.data || prodRes || [];
-
-                setInvoices(Array.isArray(invoiceData) ? invoiceData : []);
-                setProducts(Array.isArray(productData) ? productData : []);
-
-            } catch (err) {
-                console.error("Failed to load report data:", err);
-                setError("Failed to load data. Check console for details.");
-            } finally {
-                setLoading(false);
-            }
+                const [invRes, prodRes] = await Promise.all([getInvoices(), getProducts()]);
+                setInvoices(Array.isArray(invRes?.data || invRes) ? (invRes?.data || invRes) : []);
+                setProducts(Array.isArray(prodRes?.data || prodRes) ? (prodRes?.data || prodRes) : []);
+            } catch (e) { console.error(e); } 
+            finally { setLoading(false); }
         };
         loadData();
     }, []);
 
-    // Memoized calculations...
-    const filteredInvoices = useMemo(() => {
-        return Array.isArray(invoices) ? invoices.filter(inv => {
-            if (!inv.invoice_date) return false; 
-            if (!fromDate && !toDate) return true;
-            const invDate = new Date(inv.invoice_date);
-            const from = fromDate ? new Date(fromDate) : null;
-            const to = toDate ? new Date(toDate + "T23:59:59.999Z") : null; 
-            if (from && invDate < from) return false;
-            if (to && invDate > to) return false;
-            return true;
-        }) : [];
-    }, [invoices, fromDate, toDate]);
+    // --- Data Processing ---
+    const filteredData = useMemo(() => {
+        const start = fromDate ? new Date(fromDate) : null;
+        const end = toDate ? new Date(toDate + "T23:59:59.999Z") : null;
 
-    const totalSales = useMemo(() => 
-        filteredInvoices.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0)
-    , [filteredInvoices]);
-
-    const searchedInvoices = useMemo(() => {
-        return filteredInvoices.filter(inv => 
-            inv.customer_name?.toLowerCase().includes(salesSearch.toLowerCase()) || 
-            String(inv.number)?.toLowerCase().includes(salesSearch.toLowerCase()) ||
-            (inv.items || []).some(it => it.product_name?.toLowerCase().includes(salesSearch.toLowerCase()))
-        );
-    }, [filteredInvoices, salesSearch]);
-
-    const searchedStock = useMemo(() => {
-        return Array.isArray(products) ? products.filter(p => 
-            p.name?.toLowerCase().includes(stockSearch.toLowerCase()) || 
-            p.unit?.toLowerCase().includes(stockSearch.toLowerCase())
-        ) : [];
-    }, [products, stockSearch]);
-
-    const stockChartData = useMemo(() => 
-        searchedStock.map(p => ({ name: p.name, value: Number(p.quantity || 0) }))
-            .sort((a,b) => b.value - a.value)
-            .slice(0, 15)
-    , [searchedStock]);
-    
-    const totalStockValue = useMemo(() => 
-        searchedStock.reduce((sum, p) => sum + Number(p.price || 0) * Number(p.quantity || 0), 0)
-    , [searchedStock]);
-
-    const productPriceMap = useMemo(() => {
-        const map = new Map();
-        products.forEach(p => {
-            map.set(p.name, Number(p.price || 0));
+        const filteredInvoices = invoices.filter(inv => {
+            if (!inv.invoice_date) return false;
+            const d = new Date(inv.invoice_date);
+            return (!start || d >= start) && (!end || d <= end);
         });
-        return map;
-    }, [products]);
 
-    const productSoldData = useMemo(() => {
-        const productSoldMap = {};
-        filteredInvoices.forEach(inv => (inv.items || []).forEach(it => {
-            const qty = Number(it.qty || 0); 
-            if (!it.product_name) return;
-            if (!productSoldMap[it.product_name]) productSoldMap[it.product_name] = 0;
-            productSoldMap[it.product_name] += qty;
+        const q = search.toLowerCase();
+        
+        if (tab === 'sales') {
+            return filteredInvoices.filter(i => {
+                const cName = i.customer_detail?.name || i.customer_name || "";
+                return cName.toLowerCase().includes(q) || String(i.number).includes(q);
+            });
+        }
+        
+        if (tab === 'stock') {
+            return products.filter(p => p.name.toLowerCase().includes(q));
+        }
+
+        const salesMap = {};
+        filteredInvoices.forEach(inv => inv.items?.forEach(it => {
+            const name = it.product_name || "Unknown";
+            salesMap[name] = (salesMap[name] || 0) + Number(it.qty || 0);
         }));
-        return Object.entries(productSoldMap).map(([name, value]) => ({ name, value }));
-    }, [filteredInvoices]);
+        
+        return Object.entries(salesMap)
+            .map(([name, qty]) => ({ name, qty, price: products.find(p=>p.name===name)?.price || 0 }))
+            .filter(p => p.name.toLowerCase().includes(q))
+            .sort((a,b) => b.qty - a.qty);
 
-    const searchedProductSold = useMemo(() => {
-        return productSoldData.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()));
-    }, [productSoldData, productSearch]);
+    }, [invoices, products, fromDate, toDate, search, tab]);
 
-    const productSoldStats = useMemo(() => {
-        let totalQty = 0;
-        let totalAmount = 0;
-        let mostSold = null;
-
-        searchedProductSold.forEach(p => {
-            totalQty += p.value;
-            const unitPrice = productPriceMap.get(p.name) || 0;
-            totalAmount += p.value * unitPrice;
-            if (!mostSold || p.value > mostSold.value) {
-                mostSold = p;
-            }
-        });
-        return { totalQty, totalAmount, mostSold };
-    }, [searchedProductSold, productPriceMap]);
-    // --- End of memos ---
-
-
-    // --- NEW: Excel Export Function ---
-    const handleExport = () => {
-        if (!canExport && !isSubscriptionLoading) { // Check if not loading
-            alert("This is a Pro feature. Please upgrade your plan to export reports.");
-            return;
+    // --- Metrics ---
+    const metrics = useMemo(() => {
+        if (tab === 'sales') {
+            const total = filteredData.reduce((sum, i) => sum + Number(i.grand_total || 0), 0);
+            return { card1: total, card2: filteredData.length };
+        } 
+        if (tab === 'stock') {
+            const totalVal = filteredData.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+            const lowStockCount = filteredData.filter(p => Number(p.quantity) <= 5).length;
+            return { card1: totalVal, card2: lowStockCount };
         }
+        const totalUnits = filteredData.reduce((sum, p) => sum + p.qty, 0);
+        const topItem = filteredData.length > 0 ? filteredData[0] : { name: 'N/A', qty: 0 };
+        return { card1: totalUnits, card2: topItem };
+    }, [filteredData, tab]);
 
-        let dataToExport = [];
-        let filename = "report.xlsx";
-
-        if (tab === "sales") {
-            filename = "sales_report.xlsx";
-            dataToExport = searchedInvoices.map(inv => ({
-                "Invoice #": inv.number,
-                "Date": new Date(inv.invoice_date).toLocaleDateString(),
-                "Customer": inv.customer_detail?.name || inv.customer_name || "Walk-in",
-                "Mobile": inv.customer_detail?.mobile || inv.customer_mobile || "",
-                "Subtotal": inv.subtotal,
-                "Tax": inv.tax_total,
-                "Total": inv.grand_total,
-            }));
-        } else if (tab === "stock") {
-            filename = "stock_report.xlsx";
-            dataToExport = searchedStock.map(p => ({
-                "Product Name": p.name,
-                "Quantity": p.quantity,
-                "Price": p.price,
-                "Stock Value": p.price * p.quantity,
-            }));
-        } else if (tab === "products") {
-            filename = "products_sold_report.xlsx";
-            dataToExport = searchedProductSold.map(p => ({
-                "Product Name": p.name,
-                "Quantity Sold": p.value,
-                "Unit Price": productPriceMap.get(p.name) || 0,
-                "Total Value": (productPriceMap.get(p.name) || 0) * p.value,
-            }));
+    // --- Charts ---
+    const chartData = useMemo(() => {
+        if (tab === 'sales') {
+            const grouped = {};
+            filteredData.forEach(inv => {
+                const date = inv.invoice_date.split('T')[0];
+                grouped[date] = (grouped[date] || 0) + Number(inv.grand_total || 0);
+            });
+            const sorted = Object.entries(grouped).map(([date, total]) => ({ date, total })).sort((a, b) => new Date(a.date) - new Date(b.date));
+            return sorted.length > 15 ? sorted.slice(-15) : sorted;
+        } else {
+            return filteredData.slice(0, 7).map(p => ({ name: p.name.substring(0,10), value: Number(p.quantity || p.qty) }));
         }
+    }, [filteredData, tab]);
 
-        if (dataToExport.length === 0) {
-            alert("No data to export.");
-            return;
-        }
-
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Report");
-        XLSX.writeFile(wb, filename);
-    };
-
-    if (loading) return <div className="p-6 text-center text-gray-500">Loading reports...</div>;
-    if (error) return <div className="p-6 text-center text-red-500">{error}</div>;
+    if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 text-sm animate-pulse">Loading Data...</div>;
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-            {/* Tabs */}
-            <div className="flex justify-between items-center mb-4 border-b">
-                <div className="flex space-x-2 md:space-x-4">
-                    {["sales", "stock", "products"].map(t => (
-                        <button 
-                            key={t} 
-                            onClick={() => setTab(t)} 
-                            className={`px-4 py-3 rounded-t text-sm font-semibold md:text-base whitespace-nowrap transition-colors ${
-                                tab === t 
-                                ? "border-b-2 border-blue-600 text-blue-600" 
-                                : "text-gray-500 hover:text-gray-700"
-                            }`}
-                        >
-                            {t === 'sales' ? "Sales Report" : t === 'stock' ? "Stock Report" : "Products Sold"}
-                        </button>
-                    ))}
-                </div>
-                
-                {/* --- NEW: Export Button --- */}
-                <div className="relative">
-                    <button
-                        onClick={handleExport}
-                        disabled={!canExport && !isSubscriptionLoading} // Disable if not subscribed (and not loading)
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed peer"
-                    >
-                        Export to Excel
-                    </button>
-                    {(!canExport && !isSubscriptionLoading) && ( // Show tooltip if not subscribed
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-800 text-white text-xs text-center rounded-lg py-1 px-2 opacity-0 peer-hover:opacity-100 transition-opacity">
-                            Upgrade to PRO to unlock exports.
+        <div className="min-h-screen bg-[#F8FAFC] font-sans pb-24">
+            
+            {/* --- Header --- */}
+            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 transition-all">
+                <div className="max-w-7xl mx-auto px-4 py-3">
+                    <div className="flex justify-between items-center mb-3">
+                        <h1 className="text-xl font-black text-slate-800 tracking-tight">Analytics</h1>
+                        <div className="relative" ref={exportMenuRef}>
+                            <button onClick={() => setShowExportMenu(!showExportMenu)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-200 active:scale-95 transition-all">
+                                <DownloadIcon /> <span>EXPORT</span>
+                            </button>
                         </div>
-                    )}
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
+                        {[
+                            { id: 'sales', label: 'Revenue' },
+                            { id: 'stock', label: 'Inventory' },
+                            { id: 'products', label: 'Products' }
+                        ].map(t => (
+                            <button key={t.id} onClick={() => {setTab(t.id); setSearch('')}} className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all ${tab === t.id ? `bg-slate-900 text-white shadow-md scale-105` : 'bg-white text-slate-500 border border-slate-200'}`}>
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* ... (rest of the component: Sales Report, Stock Report, Products Sold Report, Invoice Modal) ... */}
-            {/* Sales Report */}
-            {tab === "sales" && (
-                <div className="bg-white shadow rounded-lg p-4 md:p-6 space-y-4">
-                    <h2 className="text-xl font-bold text-gray-800">Sales Report</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <StatCard title="Total Sales" value={formatCurrency(totalSales)} color="blue" />
-                        <StatCard title="Total Invoices" value={searchedInvoices.length} color="green" />
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <label className="flex-1"><span className="text-xs font-semibold">From:</span><input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="border p-2 rounded w-full mt-1" /></label>
-                        <label className="flex-1"><span className="text-xs font-semibold">To:</span><input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="border p-2 rounded w-full mt-1" /></label>
-                    </div>
-                    <input type="text" placeholder="Search by customer, invoice #, or product..." value={salesSearch} onChange={e => setSalesSearch(e.target.value)} className="border rounded p-2 w-full" />
+            <div className="max-w-7xl mx-auto px-4 pt-6 space-y-6">
+                
+                {/* --- Dynamic Cards --- */}
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 snap-x">
                     
-                    <ResponsiveDataView
-                        isMobile={isMobile} data={searchedInvoices} noDataMessage="No invoices found for this period."
-                        renderMobile={(inv) => (
-                            <div key={inv.id} className="bg-white rounded shadow p-3 border text-sm cursor-pointer hover:bg-blue-50" onClick={() => setSelectedInvoice(inv)}>
-                                <div className="flex justify-between items-start">
-                                    <p className="font-bold text-blue-600 pr-2">{highlightText(inv.customer_name || "Walk-in", salesSearch)}</p>
-                                    <p className="font-bold text-base whitespace-nowrap">{formatCurrency(inv.grand_total)}</p>
-                                </div>
-                                <p className="text-xs text-gray-500">{new Date(inv.invoice_date).toLocaleDateString()} - #{inv.number}</p>
-                            </div>
-                        )}
-                        renderDesktop={() => (
-                        <table className="w-full border-collapse text-sm">
-                            <thead className="bg-gray-100">
-                                <tr className="text-left">
-                                    <th className="p-2 border-b">Date</th>
-                                    <th className="p-2 border-b">Invoice #</th>
-                                    <th className="p-2 border-b">Customer</th>
-                                    <th className="p-2 border-b">Mobile</th>
-                                    <th className="p-2 border-b text-right">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {searchedInvoices.map(inv => (
-                                    <tr key={inv.id} className="even:bg-gray-50 hover:bg-blue-50 cursor-pointer" onClick={() => setSelectedInvoice(inv)}>
-                                        <td className="p-2 border-b">{new Date(inv.invoice_date).toLocaleDateString()}</td>
-                                        <td className="p-2 border-b text-blue-600 font-medium">{highlightText(String(inv.number), salesSearch)}</td>
-                                        <td className="p-2 border-b">{highlightText(inv.customer_detail?.name || inv.customer_name || "Walk-in", salesSearch)}</td>
-                                        <td className="p-2 border-b text-gray-600">
-                                            {inv.customer_detail?.mobile || inv.customer_mobile || "N/A"}
-                                        </td>
-                                        <td className="p-2 border-b text-right font-medium">{formatCurrency(inv.grand_total)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                    />
-                </div>
-            )}
-
-            {/* Stock Report */}
-            {tab === "stock" && (
-                 <div className="bg-white shadow rounded-lg p-4 md:p-6 space-y-4">
-                    <h2 className="text-xl font-bold text-gray-800">Current Stock Report</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <StatCard title="Total Inventory Value" value={formatCurrency(totalStockValue)} color="purple" />
-                        <StatCard title="Products In Stock" value={searchedStock.length} color="indigo" />
+                    {/* CARD 1: Uses the DARK variant (Bold) */}
+                    <div className="snap-center">
+                        <StatCard 
+                            title={tab === 'sales' ? "Total Revenue" : tab === 'stock' ? "Stock Value" : "Units Sold"} 
+                            value={tab === 'products' ? metrics.card1 : formatCurrency(metrics.card1)} 
+                            isDark={true}
+                            gradient={
+                                tab === 'sales' ? "bg-gradient-to-br from-[#0A1A2F] to-[#0F172A]" : 
+                                tab === 'stock' ? "bg-gradient-to-br from-[#0F172A] to-[#1E1B4B]" : 
+                                "bg-gradient-to-br from-[#155E75] to-[#1E3A8A]" 
+                            }
+                            icon={tab === 'sales' ? <TrendingUpIcon /> : tab === 'stock' ? <CubeIcon /> : <StarIcon />}
+                        />
                     </div>
-                    <div className="h-80 bg-gray-50 rounded p-2 border">
+
+                    {/* CARD 2: Uses the LIGHT variant (Subtle) */}
+                    <div className="snap-center">
+                        {tab === 'sales' && (
+                            <StatCard 
+                                title="Transactions" 
+                                value={metrics.card2} 
+                                subtext="Invoices generated" 
+                                isDark={false}
+                                // CHANGED: Lighter Version of Glacier Flow (Blue 200 -> Cyan 300)
+                                gradient="bg-gradient-to-br from-[#BFDBFE] to-[#67E8F9]" 
+                                icon={<div className="font-serif italic font-black text-xl">#</div>} 
+                            />
+                        )}
+                        {tab === 'stock' && (
+                            <StatCard 
+                                title="Low Stock Alert" 
+                                value={metrics.card2} 
+                                subtext="Items below 5 qty" 
+                                isDark={false}
+                                gradient="bg-gradient-to-br from-[#C7D2FE] to-[#CBD5E1]" // Deep Royal Light
+                                icon={<AlertIcon />} 
+                            />
+                        )}
+                        {tab === 'products' && (
+                            <StatCard 
+                                title="Top Performer" 
+                                value={metrics.card2.name?.substring(0, 10)} 
+                                subtext={`${metrics.card2.qty} units sold`} 
+                                isDark={false} 
+                                gradient="bg-gradient-to-br from-[#F1F5F9] to-[#EFF6FF]" // Cool Slate Light
+                                icon={<StarIcon />} 
+                            />
+                        )}
+                    </div>
+                </div>
+
+                {/* --- Graph --- */}
+                <div className="bg-white rounded-3xl p-1 shadow-xl shadow-slate-100 border border-slate-100 overflow-hidden">
+                    <div className="p-5 pb-0">
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Overview</p>
+                        <h2 className="text-xl font-black text-slate-800">Performance Trend</h2>
+                    </div>
+                    <div className="h-60 w-full mt-2">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stockChartData} margin={{ top: 5, right: 15, left: 0, bottom: 5 }}>
-                                <XAxis dataKey="name" tick={isMobile ? false : { fontSize: 10, angle: -30, textAnchor: 'end' }} interval={0} height={50}/>
-                                <YAxis tick={{ fontSize: 10 }} />
-                                <Tooltip formatter={(value) => [value, 'Quantity']} />
-                                <Legend verticalAlign="top" height={36}/>
-                                <Bar dataKey="value" name="Current Stock" fill="#4f46e5" isAnimationActive={!isMobile} barSize={20} />
-                            </BarChart>
+                            {tab === 'sales' ? (
+                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={themeColor.hex} stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor={themeColor.hex} stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <Tooltip cursor={{ stroke: themeColor.hex, strokeWidth: 1 }} contentStyle={{ borderRadius: '12px', fontWeight: 'bold' }} formatter={(value) => [formatCurrency(value), ""]} />
+                                    <Area type="monotone" dataKey="total" stroke={themeColor.hex} strokeWidth={3} fillOpacity={1} fill="url(#colorGradient)" />
+                                    <XAxis dataKey="date" tickFormatter={formatDate} tick={{fontSize: 10}} axisLine={false} tickLine={false} dy={10} />
+                                    <YAxis tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                                </AreaChart>
+                            ) : (
+                                <BarChart data={chartData} barSize={24} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '8px', fontWeight: 'bold' }} />
+                                    <Bar dataKey="value" fill={themeColor.hex} radius={[4,4,0,0]} />
+                                    <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false} dy={5} />
+                                    <YAxis tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                                </BarChart>
+                            )}
                         </ResponsiveContainer>
                     </div>
-                    <input type="text" placeholder="Search stock by name..." value={stockSearch} onChange={e => setStockSearch(e.target.value)} className="border rounded p-2 w-full" />
-                    
-                    <ResponsiveDataView
-                        isMobile={isMobile} data={searchedStock.sort((a, b) => a.name.localeCompare(b.name))} noDataMessage="No stock found."
-                        renderMobile={(p) => (
-                            <div key={p.id} className="bg-white rounded shadow p-3 border text-sm">
-                                <p className="font-bold">{highlightText(p.name, stockSearch)}</p>
-                                <div className="flex justify-between items-center mt-1 text-xs">
-                                    <p>Qty: <span className={Number(p.quantity) <= 5 ? "font-bold text-red-600" : "font-bold text-gray-700"}>{p.quantity}</span></p>
-                                    <p>Value: <span className="font-bold text-gray-700">{formatCurrency(p.price * p.quantity)}</span></p>
-                                </div>
-                            </div>
-                        )}
-                        renderDesktop={() => (
-                            <table className="w-full border-collapse text-sm">
-                                <thead className="bg-gray-100"><tr className="text-left"><th className="p-2 border-b">Product</th><th className="p-2 border-b text-right">Quantity</th><th className="p-2 border-b text-right">Price</th><th className="p-2 border-b text-right">Total Value</th></tr></thead>
-                                <tbody>{searchedStock.map(p => <tr key={p.id} className="even:bg-gray-50 hover:bg-blue-50">
-                                    <td className="p-2 border-b">{highlightText(p.name, stockSearch)}</td>
-                                    <td className={`p-2 border-b text-right ${Number(p.quantity) <= 5 ? "text-red-600 font-bold" : "font-medium text-gray-700"}`}>{p.quantity}</td>
-                                    <td className="p-2 border-b text-right">{formatCurrency(p.price)}</td>
-                                    <td className="p-2 border-b text-right font-medium text-gray-700">{formatCurrency(p.price * p.quantity)}</td>
-                                </tr>)}</tbody>
-                            </table>
-                        )}
-                    />
                 </div>
-            )}
 
-            {/* Products Sold Report */}
-            {tab === "products" && (
-                <div className="bg-white shadow rounded-lg p-4 md:p-6 space-y-4">
-                    <h2 className="text-xl font-bold text-gray-800">Products Sold Report</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <StatCard title="Total Quantity Sold" value={productSoldStats.totalQty} color="green" />
-                        <StatCard title="Total Sales Amount" value={formatCurrency(productSoldStats.totalAmount)} color="blue" />
-                        <StatCard title="Most Sold Product" value={productSoldStats.mostSold ? `${productSoldStats.mostSold.name} (${productSoldStats.mostSold.value})` : "N/A"} color="yellow" />
+                {/* --- Filter (Sales Only) --- */}
+                {tab === 'sales' && (
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                        <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 min-w-fit shadow-sm">
+                            <CalendarIcon />
+                            <input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="ml-2 text-xs bg-transparent outline-none text-slate-600 font-bold uppercase tracking-wide" />
+                        </div>
+                        <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 min-w-fit shadow-sm">
+                            <span className="text-slate-400 text-[10px] font-bold mr-2">TO</span>
+                            <input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="text-xs bg-transparent outline-none text-slate-600 font-bold uppercase tracking-wide" />
+                        </div>
                     </div>
-                     <div className="h-80 bg-gray-50 rounded p-2 border">
-                        <ResponsiveContainer width="100%" height="100%">
-                             <BarChart data={searchedProductSold.sort((a, b) => b.value - a.value).slice(0, 15)} margin={{ top: 5, right: 15, left: 0, bottom: 5 }}>
-                                <XAxis dataKey="name" tick={isMobile ? false : { fontSize: 10, angle: -30, textAnchor: 'end' }} interval={0} height={50}/>
-                                <YAxis tick={{ fontSize: 10 }} />
-                                <Tooltip formatter={(value) => [value, 'Quantity Sold']} />
-                                 <Legend verticalAlign="top" height={36}/>
-                                <Bar dataKey="value" name="Quantity Sold" fill="#10b981" isAnimationActive={!isMobile} barSize={20} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <input type="text" placeholder="Search products sold..." value={productSearch} onChange={e => setProductSearch(e.target.value)} className="border rounded p-2 w-full" />
-                    
-                    <ResponsiveDataView
-                        isMobile={isMobile} data={searchedProductSold.sort((a,b)=>b.value - a.value)} noDataMessage="No products sold in this period."
-                        renderMobile={(p,i) => {
-                            const unitPrice = productPriceMap.get(p.name) || 0;
-                            return (<div key={i} className="bg-white rounded shadow p-3 border text-sm">
-                                <p className="font-bold">{highlightText(p.name, productSearch)}</p>
-                                <div className="flex justify-between items-center mt-1 text-xs">
-                                    <p>Sold: <span className="font-bold">{p.value}</span></p>
-                                    <p>Amount: <span className="font-bold">{formatCurrency(p.value * unitPrice)}</span></p>
-                                </div>
-                            </div>)
-                        }}
-                        renderDesktop={() => (
-                            <table className="w-full border-collapse text-sm">
-                                <thead className="bg-gray-100"><tr className="text-left"><th className="p-2 border-b">Product</th><th className="p-2 border-b text-right">Qty Sold</th><th className="p-2 border-b text-right">Est. Price</th><th className="p-2 border-b text-right">Est. Total</th></tr></thead>
-                                <tbody>{searchedProductSold.sort((a,b)=>b.value - a.value).map((p,i) => {
-                                    const unitPrice = productPriceMap.get(p.name) || 0;
-                                    return <tr key={p.name + i} className="even:bg-gray-50 hover:bg-blue-50">
-                                                <td className="p-2 border-b">{highlightText(p.name, productSearch)}</td>
-                                                <td className="p-2 border-b text-right font-medium">{p.value}</td>
-                                                <td className="p-2 border-b text-right">{formatCurrency(unitPrice)}</td>
-                                                <td className="p-2 border-b text-right font-medium">{formatCurrency(p.value * unitPrice)}</td>
-                                           </tr>;
-                                })}</tbody>
-                            </table>
-                        )}
-                    />
+                )}
+
+                {/* --- Search --- */}
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400"><SearchIcon /></div>
+                    <input type="text" placeholder={`Search ${tab}...`} value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-3.5 bg-white border-none rounded-2xl shadow-sm text-sm font-semibold focus:ring-2 focus:ring-indigo-500 transition-shadow" />
                 </div>
-            )}
-            
+
+                {/* --- Data List --- */}
+                <div className="space-y-3 pb-10">
+                    {filteredData.length === 0 ? <div className="text-center py-10 text-gray-400 text-sm">No data found</div> : 
+                        filteredData.map((item, i) => {
+                            
+                            const displayName = tab === 'sales' 
+                                ? (item.customer_detail?.name || item.customer_name || "Walk-in") 
+                                : item.name;
+                            
+                            const initial = displayName ? displayName.charAt(0).toUpperCase() : '#';
+
+                            return (
+                                <div 
+                                    key={i}
+                                    onClick={() => tab === 'sales' && setSelectedInvoice(item)}
+                                    className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center hover:border-slate-300 transition-colors ${tab === 'sales' ? 'active:scale-[0.98] cursor-pointer' : ''}`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        {/* --- Icon with Initial (Using Theme Colors) --- */}
+                                        <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-sm font-bold shadow-inner ${themeColor.bg} ${themeColor.text}`}>
+                                            {initial}
+                                        </div>
+                                        
+                                        <div className="flex flex-col">
+                                            <h4 className="font-bold text-slate-800 text-sm truncate max-w-[150px] leading-tight">
+                                                {displayName}
+                                            </h4>
+                                            <p className="text-[10px] text-slate-400 font-semibold uppercase mt-1 tracking-wide flex items-center gap-1">
+                                                {tab === 'sales' ? <span>{formatDate(item.invoice_date)} • #{item.number}</span> : 
+                                                tab === 'stock' ? `₹${item.price}/unit` : `${item.qty} units sold`}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-right">
+                                        <p className="font-bold text-slate-800 text-sm">
+                                            {tab === 'sales' ? formatCurrency(item.grand_total) : 
+                                            tab === 'stock' ? item.quantity : formatCurrency(item.qty * item.price)}
+                                        </p>
+                                        {tab === 'stock' && Number(item.quantity) <= 5 && <span className="inline-block mt-1 text-[9px] font-bold text-white bg-red-600 px-2 py-0.5 rounded shadow-sm shadow-red-200">LOW STOCK</span>}
+                                        {tab === 'products' && i === 0 && <span className="inline-block mt-1 text-[9px] font-bold text-white bg-cyan-700 px-2 py-0.5 rounded shadow-sm shadow-cyan-200">#1 SELLER</span>}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    }
+                </div>
+            </div>
+
             {/* Invoice Modal */}
             {selectedInvoice && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
-                    <div className="bg-white rounded-lg shadow-2xl w-11/12 max-w-lg max-h-[90vh] flex flex-col">
-                        <div className="flex justify-between items-center p-4 border-b">
-                            <h2 className="text-lg font-bold">Invoice: {selectedInvoice.number}</h2>
-                            <button className="text-gray-400 hover:text-red-600 font-bold text-2xl" onClick={() => setSelectedInvoice(null)}>&times;</button>
+                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-center items-end sm:items-center animate-fade-in">
+                    <div className="absolute inset-0" onClick={() => setSelectedInvoice(null)}></div>
+                    <div className="bg-white w-full sm:w-[450px] rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 overflow-hidden max-h-[90vh] flex flex-col animate-slide-up">
+                        <div className="bg-slate-900 text-white p-6 text-center relative">
+                             <button onClick={() => setSelectedInvoice(null)} className="absolute right-4 top-4 p-2 bg-white/10 rounded-full hover:bg-white/20"><CloseIcon /></button>
+                             <h2 className="text-2xl font-black">{formatCurrency(selectedInvoice.grand_total)}</h2>
+                             <div className="mt-2 text-xs opacity-70">Paid via Cash</div>
                         </div>
-                        <div className="p-4 overflow-auto">
-                            <div className="text-sm space-y-1 mb-4">
-                                <p><strong>Customer:</strong> {selectedInvoice.customer_detail?.name || selectedInvoice.customer_name || "Walk-in"}</p>
-                                <p><strong>Date:</strong> {new Date(selectedInvoice.invoice_date).toLocaleString()}</p>
+                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-4">
+                                <p className="text-xs text-gray-400 font-bold uppercase mb-2">Customer</p>
+                                <div className="font-bold text-gray-800">{selectedInvoice.customer_detail?.name || selectedInvoice.customer_name || "Walk-in"}</div>
+                                <div className="text-sm text-gray-500">{selectedInvoice.customer_detail?.mobile || selectedInvoice.customer_mobile}</div>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse border border-gray-200 text-xs">
-                                    <thead className="bg-gray-100 text-left">
-                                        <tr>
-                                            <th className="p-2 border">Product</th>
-                                            <th className="p-2 border text-right">Qty</th>
-                                            <th className="p-2 border text-right">Price</th>
-                                            <th className="p-2 border text-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(selectedInvoice.items || []).map((item, idx) => (
-                                            <tr key={idx} className="even:bg-gray-50">
-                                                <td className="p-2 border">{item.product_name}</td>
-                                                <td className="p-2 border text-right">{item.qty}</td>
-                                                <td className="p-2 border text-right">{formatCurrency(item.unit_price)}</td>
-                                                <td className="p-2 border text-right font-medium">{formatCurrency(item.line_total || (item.qty * item.unit_price))}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="font-bold bg-gray-100">
-                                        <tr><td colSpan="3" className="p-2 border text-right">Subtotal</td><td className="p-2 border text-right">{formatCurrency(selectedInvoice.subtotal)}</td></tr>
-                                        <tr><td colSpan="3" className="p-2 border text-right">Tax</td><td className="p-2 border text-right">{formatCurrency(selectedInvoice.tax_total)}</td></tr>
-                                        <tr><td colSpan="3" className="p-2 border text-right">Grand Total</td><td className="p-2 border text-right">{formatCurrency(selectedInvoice.grand_total)}</td></tr>
-                                    </tfoot>
-                                </table>
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <p className="text-xs text-gray-400 font-bold uppercase mb-2">Items</p>
+                                {selectedInvoice.items?.map((it, i) => (
+                                    <div key={i} className="flex justify-between py-2 border-b border-dashed border-gray-100 last:border-0 text-sm">
+                                        <span>{it.product_name} <span className="text-gray-400 text-xs">x{it.qty}</span></span>
+                                        <span className="font-bold">{formatCurrency(it.qty * it.unit_price)}</span>
+                                    </div>
+                                ))}
                             </div>
-                        </div>
-                        <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
-                            <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300" onClick={() => setSelectedInvoice(null)}>Close</button>
                         </div>
                     </div>
                 </div>
             )}
+
+            <style>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+                .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+                .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+            `}</style>
         </div>
     );
 }
