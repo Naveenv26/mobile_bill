@@ -1,6 +1,7 @@
 # backend/core/settings.py
 from pathlib import Path
 from datetime import timedelta
+import dj_database_url
 import environ
 
 # =======================================
@@ -17,7 +18,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 # =======================================
 SECRET_KEY = env('SECRET_KEY', default='dev-secret-key-change-me')
 DEBUG = env.bool('DEBUG', default=True)
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 # =======================================
 # Applications
@@ -52,6 +53,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -90,10 +92,10 @@ TEMPLATES = [
 # Database
 # =======================================
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=env('DATABASE_URL', default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'),
+        conn_max_age=600
+    )
 }
 
 # =======================================
@@ -134,6 +136,16 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 # ---------------------------------
+# =======================================
+# Static & Media
+# =======================================
+STATIC_URL = '/static/'
+# 🚨 ADD THESE TWO LINES FOR PRODUCTION:
+STATIC_ROOT = BASE_DIR / 'staticfiles' 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media' # Optional: Good to define this too
 
 # =======================================
 # Razorpay (FIXED)
@@ -163,11 +175,6 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
-# =======================================
-# Static & Media
-# =======================================
-STATIC_URL = '/static/'
-MEDIA_URL = '/media/'
 
 # =======================================
 # Localization
@@ -182,5 +189,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # =======================================
 # Email (Development Only)
 # =======================================
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'noreply@smartbill.com'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = env('EMAIL_PORT', default=587)
+EMAIL_USE_TLS = env('EMAIL_USE_TLS', default=True)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='') # Use App Password if using Gmail
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@yourdomain.com')
