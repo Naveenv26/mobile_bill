@@ -1,6 +1,6 @@
 // frontend/src/components/Layout.jsx
 import React, { useState, useEffect } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
   ReceiptText, 
@@ -8,10 +8,9 @@ import {
   Package, 
   Settings, 
   LogOut, 
-  Menu, 
-  X,
   Star,
-  Zap
+  Zap,
+  User
 } from "lucide-react";
 import api from "../api/axios";
 import { logout as authLogout } from "../api/auth";
@@ -19,7 +18,8 @@ import { useSubscription } from "../context/SubscriptionContext";
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  const [shopData, setShopData] = useState(null);
   const [shopName, setShopName] = useState("Loading...");
 
   // --- Access Subscription Modal controls ---
@@ -33,6 +33,8 @@ export default function Layout({ children }) {
   // --- Logout Function ---
   const logout = () => {
     authLogout();
+    // Redirect handled by auth logic or navigate usually
+    navigate("/login");
   };
 
   // --- Fetch User and Shop Info ---
@@ -42,6 +44,7 @@ export default function Layout({ children }) {
       .then((res) => {
         const { user, shop } = res.data;
         if (shop) {
+          setShopData(shop);
           setShopName(shop.name);
           localStorage.setItem("shop", JSON.stringify(shop));
         } else if (user.role === "SHOP_OWNER" || user.role === "SHOPKEEPER") {
@@ -56,54 +59,52 @@ export default function Layout({ children }) {
       });
   }, [navigate]);
 
-  // --- Sidebar Links ---
+  // --- Navigation Configuration ---
   const links = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { name: "Billing", path: "/billing", icon: ReceiptText },
+    { name: "Home", path: "/dashboard", icon: LayoutDashboard },
+    { name: "Bill", path: "/billing", icon: ReceiptText },
     { name: "Reports", path: "/reports", icon: BarChart3 },
     { name: "Stock", path: "/stock", icon: Package },
     { name: "Settings", path: "/settings", icon: Settings },
   ];
 
-  // --- Navbar Badge ---
+  // --- Navbar Badge (Trial/Status) ---
   const getTrialBadgeForNav = () => {
     if (isSubscriptionLoading) return null;
     let text, icon, style;
     
-    const baseStyle = "ml-2 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1";
+    const baseStyle = "ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wide";
 
     if (subscription?.is_trial && subscription?.days_remaining > 0) {
-      text = `${subscription.days_remaining} Day Trial`;
+      text = `${subscription.days_remaining} Days Left`;
       icon = <Star className="w-3 h-3" />;
-      style = "bg-green-100 text-green-800";
+      style = "bg-emerald-100 text-emerald-700";
     } else if (isSubscribed) {
-      text = subscription?.plan_type || "Active";
-      icon = <Zap className="w-3 h-3" />;
-      style = "bg-white/20 text-white";
+      // On mobile we might hide this to save space, or keep it minimal
+      return null; 
     } else {
-      text = "Trial Expired";
-      icon = <X className="w-3 h-3" />;
-      style = "bg-red-200 text-red-800";
+      text = "Expired";
+      icon = <Zap className="w-3 h-3" />;
+      style = "bg-rose-100 text-rose-700";
     }
     
     return <span className={`${baseStyle} ${style}`}>{icon}{text}</span>;
   };
 
-  // --- NavLink Component ---
-  const NavItem = ({ link }) => {
+  // --- Desktop Sidebar Nav Item ---
+  const DesktopNavItem = ({ link }) => {
     const Icon = link.icon;
     return (
       <NavLink
         to={link.path}
-        end={link.path === "/dashboard"} // Exact match for Dashboard
+        end={link.path === "/dashboard"}
         className={({ isActive }) =>
-          `flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition rounded-lg ${
+          `flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
             isActive
-              ? "bg-indigo-600 text-white shadow-inner"
-              : ""
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
+              : "text-slate-400 hover:bg-slate-800 hover:text-white"
           }`
         }
-        onClick={() => setSidebarOpen(false)}
       >
         <Icon className="w-5 h-5 mr-3" />
         {link.name}
@@ -112,103 +113,118 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* --- Sidebar Overlay (Mobile) --- */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
-
-      {/* --- Sidebar --- */}
-      <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-gray-800 text-gray-300 z-40 transform transition-transform duration-300
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} 
-        lg:translate-x-0 flex flex-col`}
-      >
-        {/* --- Header / Shop Name --- */}
-        <div className="px-5 py-4 border-b border-gray-700/50">
-          <div className="flex items-center justify-between">
-            <span
-              className="font-bold text-lg text-white truncate"
-              title={shopName}
-            >
-              {shopName}
-            </span>
-            {/* Close on mobile */}
-            <button
-              className="lg:hidden text-gray-400 hover:text-white"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X size={20} />
-            </button>
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      
+      {/* --- Sidebar (Desktop Only) --- */}
+      <aside className="hidden lg:flex flex-col w-72 bg-slate-900 text-white border-r border-slate-800">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+              {shopData?.logo ? (
+                <img src={shopData.logo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+              ) : (
+                <span className="text-lg font-bold text-white">{shopName.charAt(0)}</span>
+              )}
+            </div>
+            <div className="overflow-hidden">
+              <h1 className="font-bold text-lg truncate leading-tight">{shopName}</h1>
+              <p className="text-xs text-slate-400">Business Account</p>
+            </div>
           </div>
         </div>
 
-        {/* --- Navigation Links --- */}
-        <nav className="flex-1 mt-4 space-y-1 px-4">
+        {/* Nav Links */}
+        <nav className="flex-1 px-4 py-6 space-y-2">
           {links.map((link) => (
-            <NavItem key={link.path} link={link} />
+            <DesktopNavItem key={link.path} link={link} />
           ))}
         </nav>
 
-        {/* --- Footer --- */}
-        <div className="px-4 py-4 border-t border-gray-700/50">
+        {/* Logout Footer */}
+        <div className="p-4 border-t border-slate-800">
           <button
             onClick={logout}
-            className="flex items-center w-full px-4 py-3 text-red-400 hover:bg-red-900/50 hover:text-red-300 rounded-lg transition"
+            className="flex items-center w-full px-4 py-3 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 rounded-xl transition-colors text-sm font-medium"
           >
             <LogOut className="w-5 h-5 mr-3" />
-            Logout
+            Logout Session
           </button>
         </div>
       </aside>
 
-      {/* --- Main Content --- */}
-      <div className="flex-1 flex flex-col transition-all duration-300 lg:ml-64">
-        {/* --- Top Navbar --- */}
-        <header className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            {/* --- Hamburger Menu --- */}
-            <button
-              className="text-gray-600 lg:hidden focus:outline-none"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu size={22} />
-            </button>
-            <h1 className="text-xl font-semibold text-gray-800 hidden sm:block">
-              SmartBill
-            </h1>
+      {/* --- Main Content Wrapper --- */}
+      <div className="flex-1 flex flex-col h-full relative">
+        
+        {/* --- Top Header (Mobile & Desktop) --- */}
+        <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between shrink-0 z-20">
+          {/* Left: Branding or Page Title */}
+          <div className="flex items-center gap-2">
+             <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+               SmartBill
+             </h2>
+             {getTrialBadgeForNav()}
           </div>
 
-          {/* --- Subscription Button --- */}
-          <div>
-            <button
-              onClick={openModal}
-              className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all shadow-md
-                ${
-                  isSubscribed && !subscription?.is_trial
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600"
-                    : "bg-gray-700 text-white hover:bg-gray-800"
-                }
-              `}
-            >
-              <Star className="w-4 h-4 mr-0 sm:mr-2" />
-              <span className="hidden sm:inline">
-                {!isSubscribed && !subscription?.is_trial
-                  ? "Upgrade Plan"
-                  : "Subscription"}
-              </span>
-              {getTrialBadgeForNav()}
-            </button>
+          {/* Right: Shop Profile */}
+          <div className="flex items-center gap-3">
+            {/* Subscription Button (Compact) */}
+            {!isSubscribed && !subscription?.is_trial && (
+               <button onClick={openModal} className="bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm animate-pulse">
+                 Upgrade
+               </button>
+            )}
+
+            {/* Shop Info Display */}
+            <div className="flex items-center gap-2 pl-4 border-l border-slate-100">
+                <div className="text-right hidden sm:block">
+                    <p className="text-sm font-semibold text-slate-800 max-w-[120px] truncate">{shopName}</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Owner</p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 p-0.5 flex items-center justify-center overflow-hidden">
+                    {shopData?.logo ? (
+                        <img src={shopData.logo} alt={shopName} className="w-full h-full object-cover rounded-full" />
+                    ) : (
+                        <span className="text-sm font-bold text-indigo-600">{shopName.charAt(0)}</span>
+                    )}
+                </div>
+            </div>
           </div>
         </header>
 
-        {/* --- Page Content --- */}
-        <main className="flex-1 overflow-auto p-4 sm:p-6 bg-gray-100">
+        {/* --- Page Scrollable Area --- */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 pb-24 lg:pb-6 p-4 sm:p-6">
           {children}
         </main>
+
+        {/* --- Bottom Navigation (Mobile Only) --- */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-2 z-50 pb-safe">
+          <div className="flex items-center justify-between">
+            {links.map((link) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.path || (link.path !== "/dashboard" && location.pathname.startsWith(link.path));
+              
+              return (
+                <NavLink
+                  key={link.path}
+                  to={link.path}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all duration-300 ${
+                    isActive ? "text-indigo-600 -translate-y-1" : "text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <div className={`relative ${isActive ? "bg-indigo-50 p-1.5 rounded-xl" : ""}`}>
+                    <Icon strokeWidth={isActive ? 2.5 : 2} className="w-6 h-6 transition-all" />
+                    {isActive && <span className="absolute top-0 right-0 w-2 h-2 bg-indigo-600 rounded-full border-2 border-white -mt-0.5 -mr-0.5"></span>}
+                  </div>
+                  <span className={`text-[10px] font-medium ${isActive ? "text-indigo-600" : "text-slate-400"}`}>
+                    {link.name}
+                  </span>
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+
       </div>
     </div>
   );

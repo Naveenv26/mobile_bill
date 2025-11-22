@@ -118,6 +118,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
 class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True)
+    # Allow frontend to send these, but we process them manually
     customer_name = serializers.CharField(allow_blank=True, required=False, write_only=True)
     customer_mobile = serializers.CharField(allow_blank=True, required=False, write_only=True)
     customer_detail = CustomerSerializer(source="customer", read_only=True)
@@ -127,8 +128,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = (
             "id", "shop", "customer", "customer_detail", "customer_name", "customer_mobile",
             "created_at", "total_amount", "subtotal", "tax_total", "grand_total", "status", "items",
-            "invoice_date", "number"
+            "invoice_date", "number", "payment_mode"
         )
+        # IMPORTANT: Totals are read_only so backend calculates them
         read_only_fields = (
             "id", "shop", "customer", "created_at", "total_amount", "subtotal",
             "tax_total", "grand_total", "customer_detail", "invoice_date", "number"
@@ -139,73 +141,69 @@ class InvoiceSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop("items", [])
         request = self.context.get('request')
         
-        if not request or not hasattr(request.user, 'shop'):
-             raise serializers.ValidationError("Could not determine the shop for this request.")
-        
-        # 1. Lock the shop row
         shop = Shop.objects.select_for_update().get(id=request.user.shop.id)
 
-        # 2. Increment counter
+        # 1. Generate Invoice Number
         shop.counter_invoice = F('counter_invoice') + 1
         shop.save()
         shop.refresh_from_db()
-        
-        # 3. Generate unique number using config prefix
-        prefix = shop.config.get('invoice', {}).get('prefix', 'INV-')
-        formatted_number = f"{prefix}{shop.counter_invoice}"
+        formatted_number = f"INV-{shop.counter_invoice}"
 
-        customer_name = validated_data.pop("customer_name", "Walk-in")
-        customer_mobile = validated_data.pop("customer_mobile", None)
-
+        # 2. Handle Customer
+        c_name = validated_data.pop("customer_name", "Walk-in")
+        c_mobile = validated_data.pop("customer_mobile", None)
         customer = None
-        if customer_mobile:
-            customer, created = Customer.objects.get_or_create(
-                shop=shop,
-                mobile=customer_mobile,
-                defaults={'name': customer_name}
+        if c_mobile:
+            customer, _ = Customer.objects.get_or_create(
+                shop=shop, mobile=c_mobile, defaults={'name': c_name, 'email': ''}
             )
 
-        # 4. Create Invoice
+        # 3. Create Invoice (Totals 0 initially)
         invoice = Invoice.objects.create(
             shop=shop,
             customer=customer,
-            customer_name=customer_name,
-            customer_mobile=customer_mobile,
+            customer_name=c_name,
+            customer_mobile=c_mobile,
             status="PAID",
             number=formatted_number,
-            grand_total=validated_data.get('grand_total', 0),
-            total_amount=validated_data.get('grand_total', 0),
-            subtotal=validated_data.get('subtotal', 0),
-            tax_total=validated_data.get('tax_total', 0),
-            payment_mode=validated_data.get('payment_mode', 'cash')
+            payment_mode=validated_data.get('payment_mode', 'cash'),
+            created_by=request.user,
+            grand_total=0 
         )
 
-        # 5. Create Items
-        for item_data in items_data:
-            prod = item_data['product']
-            qty = item_data['qty']
-            price = item_data['unit_price']
-            tax_rate = item_data.get('tax_rate', 0)
+        # 4. Calculate Totals from Items
+        total_calc = 0
+        tax_calc = 0
 
-            line_subtotal = price * qty
-            line_tax = (line_subtotal * tax_rate) / 100
-            line_total = line_subtotal + line_tax
+        for item in items_data:
+            prod = item['product']
+            qty = item['qty']
+            price = item['unit_price']
+            tax = item.get('tax_rate', 0)
+
+            line_total = price * qty
+            line_tax = (line_total * tax) / 100
+            
+            total_calc += line_total
+            tax_calc += line_tax
 
             InvoiceItem.objects.create(
-                invoice=invoice,
-                product=prod,
-                qty=qty,
-                unit_price=price,
-                tax_rate=tax_rate,
-                line_total=line_total
+                invoice=invoice, product=prod, qty=qty, unit_price=price,
+                tax_rate=tax, line_total=line_total + line_tax
             )
-
-            # Decrement stock
+            
+            # Reduce Stock
             prod.quantity = F('quantity') - qty
-            prod.save(update_fields=['quantity'])
+            prod.save()
+
+        # 5. Save Final Totals
+        invoice.subtotal = total_calc
+        invoice.tax_total = tax_calc
+        invoice.grand_total = total_calc + tax_calc
+        invoice.total_amount = invoice.grand_total
+        invoice.save()
 
         return invoice
-
 
 # ============================
 # OTHER SERIALIZERS
