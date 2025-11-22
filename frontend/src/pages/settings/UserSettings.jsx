@@ -39,7 +39,7 @@ export default function UserSettings() {
           <div key={user.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
-                {user.username.charAt(0).toUpperCase()}
+                {user.username?.charAt(0).toUpperCase()}
               </div>
               <div>
                 <h4 className="font-bold text-slate-900">{user.username}</h4>
@@ -52,7 +52,6 @@ export default function UserSettings() {
         {users.length === 0 && <div className="text-center text-slate-400 py-4">No staff members yet.</div>}
       </div>
 
-      {/* Simple Modal for Adding User */}
       {isModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-xl w-96 shadow-2xl">

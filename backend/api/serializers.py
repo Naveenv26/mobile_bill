@@ -1,46 +1,37 @@
-# backend/api/serializers.py
-import re
-# --- FIX: Import get_user_model ---
-from django.contrib.auth import get_user_model 
-from django.db import transaction , models
 from rest_framework import serializers
-from .models import Feedback, SubscriptionPlan, UserSubscription, Payment, Expense
-from shops.models import TaxProfile
+from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
+from django.db import transaction
 from django.db.models import F
+import re
+
+# Models
+from .models import SubscriptionPlan, UserSubscription, Payment, Expense, Feedback
+from shops.models import Shop, TaxProfile
 from catalog.models import Product
 from customers.models import Customer
 from sales.models import Invoice, InvoiceItem
-from shops.models import Shop
 
-# --- FIX: Get the correct User model ---
 User = get_user_model()
 
+# ============================
+# USER & AUTH SERIALIZERS
+# ============================
 
-# --- NEW: Add this UserSerializer ---
 class UserSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the Custom User model (for /api/me/ endpoint).
-    """
     class Meta:
         model = User
-        # Include fields you want to send to the frontend
-        fields = ("id", "username", "email", "role", "shop") 
+        fields = ("id", "username", "email", "role", "shop")
         read_only_fields = ("id", "role", "shop")
 
-
-# ---------- Register serializer ----------
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True, required=False)
 
     class Meta:
-        model = User  # <-- This now correctly points to your custom User
+        model = User
         fields = ("id", "username", "email", "password", "password2", "first_name", "last_name")
-        # Note: Your custom User model uses email as USERNAME_FIELD
-        # This serializer might conflict with your ShopRegistrationSerializer
-        # and should be reviewed. But it's fixed to use the right model.
 
-    # ... (rest of your validation logic for RegisterSerializer) ...
     def validate_username(self, value):
         if len(value) < 4:
             raise serializers.ValidationError("Username must be at least 4 characters long.")
@@ -53,8 +44,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Password must be at least 8 characters long.")
         if not re.search(r"\d", value):
             raise serializers.ValidationError("Password must contain at least one number.")
-        if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-\[\]\\\/]", value):
-            raise serializers.ValidationError("Password must contain at least one special symbol.")
         return value
 
     def validate(self, attrs):
@@ -68,11 +57,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         validated_data.pop("password2", None)
         password = validated_data.pop("password")
         
-        # --- FIX: Use email for username if username is not provided ---
-        # Your custom model requires email, but this serializer uses username.
-        # This is a temporary patch. You should align your serializers.
         email = validated_data.get("email", "")
-        username = validated_data.get("username", email) # Use email as username if not given
+        username = validated_data.get("username", email)
 
         user = User(
             username=username,
@@ -85,20 +71,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-# ---------- Model serializers ----------
+# ============================
+# SHOP & PRODUCT SERIALIZERS
+# ============================
+
 class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = "__all__"
         read_only_fields = ("id",)
 
-
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = "__all__"
-        # --- THIS IS THE FIX ---
-        # Add "shop" to this tuple
         read_only_fields = ("id", "shop")
 
     def validate_price(self, value):
@@ -118,9 +104,13 @@ class CustomerSerializer(serializers.ModelSerializer):
         read_only_fields = ("id",)
 
 
+# ============================
+# INVOICE SERIALIZERS
+# ============================
+
 class InvoiceItemSerializer(serializers.ModelSerializer):
-    # ... (Keep this serializer as it was) ...
     product_name = serializers.CharField(source='product.name', read_only=True)
+    
     class Meta:
         model = InvoiceItem
         fields = ("id", "product", "product_name", "qty", "unit_price", "tax_rate")
@@ -144,30 +134,25 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "tax_total", "grand_total", "customer_detail", "invoice_date", "number"
         )
 
-
     @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         request = self.context.get('request')
+        
         if not request or not hasattr(request.user, 'shop'):
              raise serializers.ValidationError("Could not determine the shop for this request.")
         
-        # --- START FIX: ATOMIC & GLOBALLY UNIQUE INVOICE NUMBER ---
-        
-        # 1. Lock the shop row for this transaction to prevent race conditions
+        # 1. Lock the shop row
         shop = Shop.objects.select_for_update().get(id=request.user.shop.id)
 
-        # 2. Atomically increment the counter on the database
+        # 2. Increment counter
         shop.counter_invoice = F('counter_invoice') + 1
         shop.save()
+        shop.refresh_from_db()
         
-        # 3. Get the new, unique value back from the database
-        shop.refresh_from_db() 
-        
-        # 4. Create a GLOBALLY unique number (e.g., "1-1", "2-1", "1-2")
-        formatted_number = f"{shop.id}-{shop.counter_invoice}"
-        
-        # --- END FIX ---
+        # 3. Generate unique number using config prefix
+        prefix = shop.config.get('invoice', {}).get('prefix', 'INV-')
+        formatted_number = f"{prefix}{shop.counter_invoice}"
 
         customer_name = validated_data.pop("customer_name", "Walk-in")
         customer_mobile = validated_data.pop("customer_mobile", None)
@@ -180,19 +165,22 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 defaults={'name': customer_name}
             )
 
+        # 4. Create Invoice
         invoice = Invoice.objects.create(
             shop=shop,
             customer=customer,
             customer_name=customer_name,
             customer_mobile=customer_mobile,
             status="PAID",
-            number=formatted_number # <-- This is now globally unique
+            number=formatted_number,
+            grand_total=validated_data.get('grand_total', 0),
+            total_amount=validated_data.get('grand_total', 0),
+            subtotal=validated_data.get('subtotal', 0),
+            tax_total=validated_data.get('tax_total', 0),
+            payment_mode=validated_data.get('payment_mode', 'cash')
         )
 
-        total_amount = 0
-        subtotal = 0
-        tax_total = 0
-
+        # 5. Create Items
         for item_data in items_data:
             prod = item_data['product']
             qty = item_data['qty']
@@ -203,10 +191,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
             line_tax = (line_subtotal * tax_rate) / 100
             line_total = line_subtotal + line_tax
 
-            subtotal += line_subtotal
-            tax_total += line_tax
-            total_amount += line_total
-
             InvoiceItem.objects.create(
                 invoice=invoice,
                 product=prod,
@@ -216,18 +200,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 line_total=line_total
             )
 
-            # This F() expression prevents race conditions on stock updates too
+            # Decrement stock
             prod.quantity = F('quantity') - qty
-            prod.save(update_fields=['quantity']) # More efficient save
-
-        invoice.subtotal = subtotal
-        invoice.tax_total = tax_total
-        invoice.grand_total = total_amount
-        invoice.total_amount = total_amount
-        invoice.save()
+            prod.save(update_fields=['quantity'])
 
         return invoice
-   
+
+
+# ============================
+# OTHER SERIALIZERS
+# ============================
 
 class TaxProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -235,8 +217,6 @@ class TaxProfileSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("id",)
 
-
-# ... (rest of your serializers: SubscriptionPlanSerializer, UserSubscriptionSerializer, etc.) ...
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
     plan_type_display = serializers.CharField(source='get_plan_type_display', read_only=True)
     duration_display = serializers.CharField(source='get_duration_display', read_only=True)
@@ -249,8 +229,6 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
             'features', 'is_active', 'created_at'
         ]
 
-
-# ========== USER SUBSCRIPTION SERIALIZER ==========
 class UserSubscriptionSerializer(serializers.ModelSerializer):
     plan_details = SubscriptionPlanSerializer(source='plan', read_only=True)
     plan_type = serializers.SerializerMethodField()
@@ -282,8 +260,6 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
     def get_is_trial(self, obj):
         return obj.is_trial_active()
 
-
-# ========== PAYMENT SERIALIZER ==========
 class PaymentSerializer(serializers.ModelSerializer):
     plan_details = SubscriptionPlanSerializer(source='plan', read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
@@ -298,27 +274,21 @@ class PaymentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['order_id', 'payment_id', 'status']
 
-
-# ========== CREATE ORDER SERIALIZER ==========
 class CreateOrderSerializer(serializers.Serializer):
     plan_id = serializers.IntegerField()
     
     def validate_plan_id(self, value):
         try:
-            plan = SubscriptionPlan.objects.get(id=value, is_active=True)
+            SubscriptionPlan.objects.get(id=value, is_active=True)
             return value
         except SubscriptionPlan.DoesNotExist:
             raise serializers.ValidationError("Invalid or inactive plan.")
 
-
-# ========== VERIFY PAYMENT SERIALIZER ==========
 class VerifyPaymentSerializer(serializers.Serializer):
     razorpay_order_id = serializers.CharField()
     razorpay_payment_id = serializers.CharField()
     razorpay_signature = serializers.CharField()
 
-
-# ========== EXPENSE SERIALIZER (PRO FEATURE) ==========
 class ExpenseSerializer(serializers.ModelSerializer):
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)

@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 import ProfileSettings from "./settings/ProfileSettings";
 import InvoiceSettings from "./settings/InvoiceSettings";
 import InventorySettings from "./settings/InventorySettings";
-import UserSettings from "./settings/UserSettings";
+// Removed UserSettings import
 import TaxSettings from "./settings/TaxSettings";
 import NotificationSettings from "./settings/NotificationSettings";
 import CustomerSettings from "./settings/CustomerSettings";
@@ -17,7 +17,7 @@ const Icons = {
   Profile: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
   Invoice: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
   Inventory: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
-  Users: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  // Removed Users Icon
   Tax: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
   Report: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
   Customer: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
@@ -27,18 +27,17 @@ const Icons = {
 };
 
 export default function Settings() {
-  // On mobile, 'activeTab' is null initially. On desktop, default to 'profile'.
   const [activeTab, setActiveTab] = useState(null);
   const [shopData, setShopData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // --- 1. Fetch Data Logic ---
   const fetchShopData = async () => {
     setLoading(true);
     try {
       const res = await axios.get("/me/");
       setShopData(res.data.shop);
+      localStorage.setItem("shop", JSON.stringify(res.data.shop));
     } catch (err) {
       console.error(err);
       toast.error("Failed to load settings");
@@ -51,7 +50,6 @@ export default function Settings() {
     fetchShopData();
   }, []);
 
-  // --- 2. Resize Logic ---
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -63,22 +61,21 @@ export default function Settings() {
     return () => window.removeEventListener("resize", handleResize);
   }, [activeTab]);
 
-  // --- 3. The Missing Update Function ---
-  const updateSettings = async (newConfigOrData) => {
+  // --- UPDATE FUNCTION ---
+  const updateSettings = async (category, newData) => {
     if (!shopData) return;
 
-    // Merge existing config with new updates
-    // "config" is a JSON field in your backend Shop model
     const currentConfig = shopData.config || {};
-    const updatedConfig = { ...currentConfig, ...newConfigOrData };
+    const updatedConfig = { 
+        ...currentConfig, 
+        [category]: { ...(currentConfig[category] || {}), ...newData } 
+    };
 
     try {
-      await axios.patch(`/shops/${shopData.id}/`, {
-         config: updatedConfig
-      });
-      
-      // Optimistically update local state
-      setShopData({ ...shopData, config: updatedConfig });
+      await axios.patch(`/shops/${shopData.id}/`, { config: updatedConfig });
+      const newShopData = { ...shopData, config: updatedConfig };
+      setShopData(newShopData);
+      localStorage.setItem("shop", JSON.stringify(newShopData));
       toast.success("Settings saved!");
     } catch (err) {
       console.error(err);
@@ -86,40 +83,28 @@ export default function Settings() {
     }
   };
 
-  // --- 4. Render Content (Passing the Props!) ---
   const renderContent = () => {
     if (loading && !shopData) return <div className="p-10 text-center">Loading settings...</div>;
     
-    // Safely access config
     const config = shopData?.config || {};
 
     switch (activeTab) {
       case "profile": 
         return <ProfileSettings shop={shopData} />;
-        
       case "invoice": 
-        return <InvoiceSettings settings={config.invoice || {}} onUpdate={(d) => updateSettings({ invoice: { ...config.invoice, ...d } })} />;
-        
+        return <InvoiceSettings settings={config.invoice || {}} onUpdate={(d) => updateSettings('invoice', d)} />;
       case "inventory": 
-        return <InventorySettings settings={config.inventory || {}} onUpdate={(d) => updateSettings({ inventory: { ...config.inventory, ...d } })} />;
-        
-      case "users": 
-        return <UserSettings />; // Manages its own API calls
-        
+        return <InventorySettings settings={config.inventory || {}} onUpdate={(d) => updateSettings('inventory', d)} />;
+      // Removed case "users"
       case "tax": 
-        return <TaxSettings settings={config.tax || {}} onUpdate={(d) => updateSettings({ tax: { ...config.tax, ...d } })} />;
-        
+        return <TaxSettings settings={config.tax || {}} onUpdate={(d) => updateSettings('tax', d)} />;
       case "reports": 
-        return <NotificationSettings settings={config.notifications || {}} onUpdate={(d) => updateSettings({ notifications: { ...config.notifications, ...d } })} />;
-        
+        return <NotificationSettings settings={config.notifications || {}} onUpdate={(d) => updateSettings('notifications', d)} />;
       case "customers": 
-        return <CustomerSettings settings={config.customer || {}} onUpdate={(d) => updateSettings({ customer: { ...config.customer, ...d } })} />;
-        
+        return <CustomerSettings settings={config.customer || {}} onUpdate={(d) => updateSettings('customer', d)} />;
       case "feedback": 
         return <FeedbackSettings />;
-        
-      default: 
-        return null;
+      default: return null;
     }
   };
 
@@ -127,70 +112,49 @@ export default function Settings() {
     { id: "profile", label: "Shop Profile", desc: "Name, Address, Logo", icon: <Icons.Profile /> },
     { id: "invoice", label: "Invoice & Billing", desc: "Print size, Prefixes", icon: <Icons.Invoice /> },
     { id: "inventory", label: "Inventory Rules", desc: "Units, Thresholds", icon: <Icons.Inventory /> },
-    { id: "users", label: "Staff & Roles", desc: "Manage access", icon: <Icons.Users /> },
+    // Removed Users Tab
     { id: "tax", label: "Tax & Currency", desc: "GST, Symbols", icon: <Icons.Tax /> },
     { id: "reports", label: "Daily Reports", desc: "Email summaries", icon: <Icons.Report /> },
     { id: "customers", label: "Customers", desc: "Defaults, Credits", icon: <Icons.Customer /> },
     { id: "feedback", label: "Feedback", desc: "Rate us", icon: <Icons.Feedback /> },
   ];
 
-  // --- 5. Render View (Mobile/Desktop) ---
-  
-  // Mobile List View
   if (isMobile && !activeTab) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <div className="bg-white px-4 py-4 border-b border-slate-200 sticky top-0 z-10">
-          <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        </div>
-        <div className="divide-y divide-slate-100 bg-white mt-2 border-t border-b border-slate-200">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left"
-            >
-              <div className="flex items-center gap-4">
-                <div className="text-slate-500">{tab.icon}</div>
-                <div>
-                  <div className="text-base font-medium text-slate-900">{tab.label}</div>
-                  <div className="text-xs text-slate-500">{tab.desc}</div>
+     return (
+        <div className="min-h-screen bg-slate-50">
+          <div className="bg-white px-4 py-4 border-b border-slate-200 sticky top-0 z-10">
+            <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+          </div>
+          <div className="divide-y divide-slate-100 bg-white mt-2 border-t border-b border-slate-200">
+            {tabs.map((tab) => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 text-left">
+                <div className="flex items-center gap-4">
+                  <div className="text-slate-500">{tab.icon}</div>
+                  <div>
+                    <div className="text-base font-medium text-slate-900">{tab.label}</div>
+                    <div className="text-xs text-slate-500">{tab.desc}</div>
+                  </div>
                 </div>
-              </div>
-              <Icons.ChevronRight />
-            </button>
-          ))}
+                <Icons.ChevronRight />
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="p-4 text-center text-xs text-slate-400 mt-4">
-          Version 1.0.0 • Build 2025
-        </div>
-      </div>
-    );
+     );
   }
 
-  // Mobile Detail View
   if (isMobile && activeTab) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
-        <div className="bg-white px-4 py-3 border-b border-slate-200 sticky top-0 z-20 flex items-center gap-3 shadow-sm">
-          <button 
-            onClick={() => setActiveTab(null)} 
-            className="p-1 -ml-2 rounded-full hover:bg-slate-100 text-slate-600"
-          >
-            <Icons.ArrowLeft />
-          </button>
-          <h2 className="text-lg font-bold text-slate-900 truncate">
-            {tabs.find(t => t.id === activeTab)?.label}
-          </h2>
-        </div>
-        <div className="flex-1 p-4 overflow-y-auto">
-          {renderContent()}
-        </div>
-      </div>
-    );
+      return (
+          <div className="min-h-screen bg-slate-50 flex flex-col">
+            <div className="bg-white px-4 py-3 border-b border-slate-200 sticky top-0 z-20 flex items-center gap-3 shadow-sm">
+              <button onClick={() => setActiveTab(null)} className="p-1 -ml-2 rounded-full hover:bg-slate-100 text-slate-600"><Icons.ArrowLeft /></button>
+              <h2 className="text-lg font-bold text-slate-900 truncate">{tabs.find(t => t.id === activeTab)?.label}</h2>
+            </div>
+            <div className="flex-1 p-4 overflow-y-auto">{renderContent()}</div>
+          </div>
+      );
   }
 
-  // Desktop View
   return (
     <div className="flex h-[calc(100vh-64px)] bg-slate-50 font-sans text-slate-800">
       <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm z-10 overflow-y-auto">

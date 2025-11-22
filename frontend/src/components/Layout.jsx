@@ -6,7 +6,6 @@ import {
   ReceiptText, 
   BarChart3, 
   Package, 
-  Lightbulb, 
   Settings, 
   LogOut, 
   Menu, 
@@ -17,7 +16,6 @@ import {
 import api from "../api/axios";
 import { logout as authLogout } from "../api/auth";
 import { useSubscription } from "../context/SubscriptionContext";
-// ❌ We no longer import Subscription here. It's in App.jsx
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
@@ -31,11 +29,6 @@ export default function Layout({ children }) {
     subscription,
     loading: isSubscriptionLoading,
   } = useSubscription();
-
-  // --- Gemini API States ---
-  const [isTipModalOpen, setIsTipModalOpen] = useState(false);
-  const [tipContent, setTipContent] = useState("");
-  const [isTipLoading, setIsTipLoading] = useState(false);
 
   // --- Logout Function ---
   const logout = () => {
@@ -63,53 +56,6 @@ export default function Layout({ children }) {
       });
   }, [navigate]);
 
-  // --- (All Gemini API functions remain the same) ---
-  const fetchWithBackoff = async (url, options, retries = 3, delay = 1000) => {
-    // ... (omitted for brevity, keep your existing function)
-  };
-  const fetchBusinessTip = async () => {
-    // ... (omitted for brevity, keep your existing function)
-  };
-  const handleGetTipClick = () => {
-    setIsTipModalOpen(true);
-    // fetchBusinessTip(); // Uncomment this when you have your API key
-    
-    // Placeholder for now:
-    setIsTipLoading(true);
-    setTimeout(() => {
-      setTipContent("To increase sales, try bundling related items together for a small discount.");
-      setIsTipLoading(false);
-    }, 1000);
-  };
-  
-  const GeminiTipModal = () => {
-    if (!isTipModalOpen) return null;
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-purple-600 flex items-center">
-              <Lightbulb className="w-6 h-6 mr-2" /> Daily Business Tip
-            </h2>
-            <button
-              onClick={() => setIsTipModalOpen(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="min-h-[100px] flex items-center justify-center">
-            {isTipLoading ? (
-              <Loader2 className="animate-spin h-8 w-8 text-purple-600" />
-            ) : (
-              <p className="text-gray-700 text-center">{tipContent}</p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
   // --- Sidebar Links ---
   const links = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -205,15 +151,6 @@ export default function Layout({ children }) {
           {links.map((link) => (
             <NavItem key={link.path} link={link} />
           ))}
-
-          {/* --- GEMINI FEATURE --- */}
-          <button
-            onClick={handleGetTipClick}
-            className="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition rounded-lg w-full text-left"
-          >
-            <Lightbulb className="w-5 h-5 mr-3 text-yellow-400" />
-            Get Daily Tip
-          </button>
         </nav>
 
         {/* --- Footer --- */}
@@ -273,11 +210,6 @@ export default function Layout({ children }) {
           {children}
         </main>
       </div>
-
-      {/* --- ❌ Subscription Modal is REMOVED from here --- */}
-
-      {/* --- ✨ GEMINI MODAL --- */}
-      <GeminiTipModal />
     </div>
   );
 }

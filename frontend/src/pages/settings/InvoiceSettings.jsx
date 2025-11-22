@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 export default function InvoiceSettings({ settings, onUpdate }) {
   const [form, setForm] = useState({
@@ -17,12 +17,7 @@ export default function InvoiceSettings({ settings, onUpdate }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Invoice Prefix</label>
-            <input 
-                name="prefix" 
-                value={form.prefix} 
-                onChange={handleChange} 
-                className="w-full border-slate-200 rounded-lg p-2.5 bg-slate-50" 
-            />
+            <input name="prefix" value={form.prefix} onChange={handleChange} className="w-full border-slate-200 rounded-lg p-2.5 bg-slate-50" />
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Paper Size</label>
@@ -34,8 +29,6 @@ export default function InvoiceSettings({ settings, onUpdate }) {
           </div>
         </div>
       </div>
-
-      {/* Bank & Terms */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h3 className="text-lg font-bold text-slate-900 mb-4">Details</h3>
         <div className="space-y-4">
@@ -49,7 +42,6 @@ export default function InvoiceSettings({ settings, onUpdate }) {
             </div>
         </div>
       </div>
-
       <div className="flex justify-end">
         <button onClick={() => onUpdate(form)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl hover:bg-slate-800 shadow-lg">Save Changes</button>
       </div>

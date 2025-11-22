@@ -71,12 +71,18 @@ export default function Stock() {
     const [search, setSearch] = useState("");
     const [sortKey, setSortKey] = useState("name");
     const [sortDir, setSortDir] = useState("asc");
-    const [lowStockThreshold] = useState(5); 
     const [toast, setToast] = useState(null);
     const [countdown, setCountdown] = useState(5);
     const lastDeleted = useRef(null);
 
     const isMobile = useMediaQuery("(max-width: 768px)");
+
+    // --- 1. READ CONFIG FROM STORAGE ---
+    // This pulls the 'lowStockLimit' you saved in Settings -> Inventory
+    const shop = JSON.parse(localStorage.getItem("shop")) || {};
+    const config = shop.config || {};
+    const lowStockThreshold = Number(config.inventory?.lowStockLimit ?? 5);
+    // ---------------------------------
 
     useEffect(() => { load() }, []);
 
@@ -231,7 +237,7 @@ export default function Stock() {
             badge: "bg-white border-rose-200 text-rose-700"
         };
 
-        // Low Stock: Light Amber Shade
+        // Low Stock: Light Amber Shade (Uses Dynamic Threshold)
         if (qty <= lowStockThreshold) return {
             border: "border-t-4 border-t-amber-400 border-x border-b border-amber-100",
             bg: "bg-amber-50/50", 
@@ -288,6 +294,7 @@ export default function Stock() {
                     />
                     <StatsCard 
                         title="Low Stock Alerts"
+                        // Use dynamic threshold here
                         value={products.filter(p => p.quantity > 0 && p.quantity <= lowStockThreshold).length}
                         colorFrom="from-amber-500"
                         colorTo="to-orange-500"

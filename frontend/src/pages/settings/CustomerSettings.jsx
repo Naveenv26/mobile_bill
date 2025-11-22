@@ -7,19 +7,13 @@ export default function CustomerSettings({ settings, onUpdate }) {
   const [defaultPhone, setDefaultPhone] = useState(settings?.defaultPhone || "");
 
   const handleSave = () => {
-    onUpdate({
-        phoneMandatory,
-        allowCredit,
-        defaultName,
-        defaultPhone
-    });
+    onUpdate({ phoneMandatory, allowCredit, defaultName, defaultPhone });
   };
 
   return (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
         <div>
             <h3 className="text-lg font-bold text-slate-900 mb-4">Customer Constraints</h3>
-            
             <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                     <span className="text-slate-700 font-medium">Phone Number is Mandatory</span>
@@ -31,7 +25,6 @@ export default function CustomerSettings({ settings, onUpdate }) {
                 </div>
             </div>
         </div>
-
         <div>
             <h3 className="text-lg font-bold text-slate-900 mb-4">Default Customer (Walk-in)</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -39,7 +32,6 @@ export default function CustomerSettings({ settings, onUpdate }) {
                 <input type="text" value={defaultPhone} onChange={(e) => setDefaultPhone(e.target.value)} placeholder="Phone (e.g., 0000000000)" className="border-slate-200 rounded-lg p-2.5" />
             </div>
         </div>
-        
         <div className="flex justify-end">
             <button onClick={handleSave} className="bg-slate-900 text-white px-6 py-2 rounded-xl hover:bg-slate-800">Update Settings</button>
         </div>
