@@ -1,3 +1,4 @@
+// frontend/src/pages/Reports.jsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getInvoices } from "../api/invoices.js";
 import { getProducts } from "../api/products.js";
@@ -56,7 +57,8 @@ export default function Reports() {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    const { isSubscribed } = useSubscription();
+    // 1. Get hasFeature
+    const { isSubscribed, hasFeature } = useSubscription();
     const exportMenuRef = useRef(null);
 
     // --- THEME CONFIGURATION ---
@@ -157,11 +159,15 @@ export default function Reports() {
                 <div className="max-w-7xl mx-auto px-4 py-3">
                     <div className="flex justify-between items-center mb-3">
                         <h1 className="text-xl font-black text-slate-800 tracking-tight">Analytics</h1>
-                        <div className="relative" ref={exportMenuRef}>
-                            <button onClick={() => setShowExportMenu(!showExportMenu)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-200 active:scale-95 transition-all">
-                                <DownloadIcon /> <span>EXPORT</span>
-                            </button>
-                        </div>
+                        
+                        {/* 2. Gate the Export Button */}
+                        {hasFeature('export') && (
+                            <div className="relative" ref={exportMenuRef}>
+                                <button onClick={() => setShowExportMenu(!showExportMenu)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-200 active:scale-95 transition-all">
+                                    <DownloadIcon /> <span>EXPORT</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Tabs */}
@@ -207,7 +213,6 @@ export default function Reports() {
                                 value={metrics.card2} 
                                 subtext="Invoices generated" 
                                 isDark={false}
-                                // CHANGED: Lighter Version of Glacier Flow (Blue 200 -> Cyan 300)
                                 gradient="bg-gradient-to-br from-[#BFDBFE] to-[#67E8F9]" 
                                 icon={<div className="font-serif italic font-black text-xl">#</div>} 
                             />
