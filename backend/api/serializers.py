@@ -147,7 +147,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
         shop.counter_invoice = F('counter_invoice') + 1
         shop.save()
         shop.refresh_from_db()
-        formatted_number = f"INV-{shop.counter_invoice}"
+        # Example: "INV-10-1" (ShopID-Counter)
+        formatted_number = f"INV-{shop.id}-{shop.counter_invoice}"
 
         # 2. Handle Customer
         c_name = validated_data.pop("customer_name", "Walk-in")

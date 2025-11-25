@@ -142,24 +142,28 @@ export default function Stock() {
     };
 
     const adjustQty = async (p, change) => {
-        const currentQty = Number(p.quantity || 0);
-        const newQty = currentQty + Number(change);
-        if (newQty < 0) return;
+    const currentQty = Number(p.quantity || 0);
+    const newQty = currentQty + Number(change);
 
-        const updatedProduct = { ...p, quantity: newQty };
-        const backup = [...products];
-        setProducts(prev => prev.map(x => (x.id === p.id ? updatedProduct : x)));
+    // --- FIX START ---
+    if (change < 0 && newQty < 0) return;
+    // --- FIX END ---
 
-        try {
-            const { id, ...payload } = updatedProduct;
-            await updateProduct(p.id, payload);
-        } catch (err) {
-            console.error("Quantity update failed:", err.response?.data || err);
-            setProducts(backup);
-            alert("Failed to update quantity. Reverted.");
-        }
-    };
+    const updatedProduct = { ...p, quantity: newQty };
+    const backup = [...products];
+    
+    // ... rest of the function remains the same
+    setProducts(prev => prev.map(x => (x.id === p.id ? updatedProduct : x)));
 
+    try {
+        const { id, ...payload } = updatedProduct;
+        await updateProduct(p.id, payload);
+    } catch (err) {
+        console.error("Quantity update failed:", err.response?.data || err);
+        setProducts(backup);
+        alert("Failed to update quantity. Reverted.");
+    }
+  };
     const openModal = (product = null) => {
         setEditing(product);
         setForm(product ? {
