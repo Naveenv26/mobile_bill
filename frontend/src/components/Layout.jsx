@@ -27,7 +27,7 @@ export default function Layout({ children }) {
         openModal,
         subscription,
         loading: isSubscriptionLoading,
-        hasFeature, 
+        // hasFeature, // No longer needed for hiding/showing links
     } = useSubscription();
 
     const logout = () => {
@@ -37,7 +37,7 @@ export default function Layout({ children }) {
 
     // --- Centralized Shop Data Fetching ---
     const fetchShopData = () => {
-        // 1. Try local storage first
+        // 1. Try local storage first for instant render
         const cached = localStorage.getItem("shop");
         if (cached) {
             try {
@@ -49,7 +49,7 @@ export default function Layout({ children }) {
             }
         }
 
-        // 2. Fetch fresh data
+        // 2. Then fetch fresh data from API
         api.get("/me/")
             .then((res) => {
                 const { user, shop } = res.data;
@@ -71,19 +71,22 @@ export default function Layout({ children }) {
 
     useEffect(() => {
         fetchShopData();
+
+        // --- Listen for 'shop-updated' event to refresh immediately ---
         const handleShopUpdate = () => fetchShopData();
         window.addEventListener('shop-updated', handleShopUpdate);
+
         return () => window.removeEventListener('shop-updated', handleShopUpdate);
     }, [navigate]);
 
     // --- Navigation Configuration ---
-    // FIXED: Removed 'feature' requirement for Home and Settings so they always show
+    // Removed 'feature' keys effectively, as we want to show everything now.
     const links = [
-        { name: "Home", path: "/dashboard", icon: LayoutDashboard }, // Always visible
-        { name: "Bill", path: "/billing", icon: ReceiptText, feature: "billing" },
-        { name: "Reports", path: "/reports", icon: BarChart3, feature: "reports" },
-        { name: "Stock", path: "/stock", icon: Package, feature: "stock" },
-        { name: "Settings", path: "/settings", icon: Settings }, // Always visible
+        { name: "Home", path: "/dashboard", icon: LayoutDashboard },
+        { name: "Bill", path: "/billing", icon: ReceiptText },
+        { name: "Reports", path: "/reports", icon: BarChart3 },
+        { name: "Stock", path: "/stock", icon: Package },
+        { name: "Settings", path: "/settings", icon: Settings },
     ];
 
     // --- Navbar Badge ---
@@ -138,7 +141,7 @@ export default function Layout({ children }) {
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
             
-            {/* Top spacing fix */}
+            {/* --- Top Bar (Mobile Fix) --- */}
             <div className="fixed top-0 left-0 right-0 h-[0.5cm] bg-black z-[100] lg:hidden"></div>
 
             {/* Sidebar (Desktop) */}
@@ -159,11 +162,10 @@ export default function Layout({ children }) {
                     </div>
                 </div>
 
+                {/* --- FIXED: Removed .filter() so all links show --- */}
                 <nav className="flex-1 px-4 py-6 space-y-2">
-                    {links
-                        .filter(link => !link.feature || hasFeature(link.feature))
-                        .map((link) => (
-                            <DesktopNavItem key={link.path} link={link} />
+                    {links.map((link) => (
+                        <DesktopNavItem key={link.path} link={link} />
                     ))}
                 </nav>
 
@@ -203,6 +205,7 @@ export default function Layout({ children }) {
                     </div>
                 </header>
 
+                {/* Page Scrollable Area */}
                 <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 pb-24 lg:pb-6 p-4 sm:p-6">
                     {children}
                 </main>
@@ -210,9 +213,8 @@ export default function Layout({ children }) {
                 {/* Bottom Navigation (Mobile Only) */}
                 <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-2 z-50 pb-safe">
                     <div className="flex items-center justify-between">
-                        {links
-                            .filter(link => !link.feature || hasFeature(link.feature))
-                            .map((link) => {
+                        {/* --- FIXED: Removed .filter() here too --- */}
+                        {links.map((link) => {
                                 const Icon = link.icon;
                                 const isActive = location.pathname === link.path || (link.path !== "/dashboard" && location.pathname.startsWith(link.path));
                                 
