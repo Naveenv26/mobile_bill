@@ -1,21 +1,21 @@
-import React, { Suspense } from "react";
+import React from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { SubscriptionProvider, useSubscription } from "./context/SubscriptionContext";
 import SubscriptionModal from "./pages/Subscription";
 import GlobalLoader from "./components/GlobalLoader";
 
-// --- LAZY IMPORT PAGES ---
-const Login = React.lazy(() => import("./pages/Login"));
-const Dashboard = React.lazy(() => import("./pages/Dashboard"));
-const Billing = React.lazy(() => import("./pages/Billing"));
-const Stock = React.lazy(() => import("./pages/Stock"));
-const Reports = React.lazy(() => import("./pages/Reports"));
-const Settings = React.lazy(() => import("./pages/Settings"));
-const ShopSetup = React.lazy(() => import("./pages/ShopSetup"));
-const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
+// --- STANDARD IMPORTS (No Lazy Loading) ---
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Billing from "./pages/Billing";
+import Stock from "./pages/Stock";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
+import ShopSetup from "./pages/ShopSetup";
+import ResetPassword from "./pages/ResetPassword";
 
-// Import Layout Components (Keep these eager or lazy, eager is usually fine for layout)
+// Import Layout Components
 import Layout from "./components/Layout";
 import PrivateRoute from "./components/PrivateRoute";
 
@@ -35,8 +35,7 @@ const MainContent = () => {
   }
 
   return (
-    // Suspense handles the loading state while fetching the Lazy chunks
-    <Suspense fallback={<GlobalLoader />}>
+    <>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
@@ -61,7 +60,7 @@ const MainContent = () => {
       
       {/* Paywall Modal */}
       <SubscriptionModal />
-    </Suspense>
+    </>
   );
 };
 
