@@ -4,8 +4,6 @@ import { getProducts } from "../api/products.js";
 import { createInvoice } from "../api/invoices.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
 import toast from "react-hot-toast";
-
-// --- PDF Generation Libraries ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -18,28 +16,37 @@ const ShareIcon = () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 
 const ChevronRight = () => <svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>;
 
 export default function Billing() {
-  // --- State ---
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   
-  // Input States
   const [customerName, setCustomerName] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
   const [search, setSearch] = useState("");
   
-  // UI States
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [invoiceData, setInvoiceData] = useState(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  const { hasFeature } = useSubscription();
+  // --- NEW: Live Shop Details ---
+  const [currentShop, setCurrentShop] = useState(
+    JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "" }
+  );
 
+  const { hasFeature } = useSubscription();
   const nameRef = useRef();
   const searchRef = useRef();
-  const shop = JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "" };
 
-  // --- Load Products ---
+  // --- NEW: Sync shop details listener ---
+  useEffect(() => {
+    const handleUpdate = () => {
+        const updated = JSON.parse(localStorage.getItem("shop"));
+        if (updated) setCurrentShop(updated);
+    };
+    window.addEventListener('shop-updated', handleUpdate);
+    return () => window.removeEventListener('shop-updated', handleUpdate);
+  }, []);
+
   const loadProducts = async () => {
     try {
       const res = await getProducts();
@@ -62,14 +69,12 @@ export default function Billing() {
 
   useEffect(() => { loadProducts(); }, []);
 
-  // --- Cart Logic ---
   const addToCart = (p) => {
     setCart((prev) => {
       const found = prev.find((c) => c.id === p.id);
       if (found) return prev.map((c) => (c.id === p.id ? { ...c, qty: c.qty + 1 } : c));
       return [...prev, { ...p, qty: 1 }];
     });
-    // Fancy custom toast
     toast.custom((t) => (
       <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-slate-800 text-white shadow-lg rounded-full pointer-events-auto flex ring-1 ring-black ring-opacity-5 px-4 py-2 items-center justify-center mb-24`}>
         <div className="flex items-center">
@@ -96,14 +101,13 @@ export default function Billing() {
   const total = subtotal + tax;
   const totalItems = cart.reduce((sum, c) => sum + c.qty, 0);
 
-  // --- Finalize Logic ---
   const finalizeInvoice = async () => {
     if (!cart.length) return toast.error("Cart is empty");
     if (typeof hasFeature === 'function' && !hasFeature('billing')) return toast.error("Upgrade plan required.");
 
     try {
       const payload = {
-        shop: shop.id,
+        shop: currentShop.id, // Use updated shop state
         customer_name: customerName || "Walk-in",
         customer_mobile: customerMobile || "",
         items: cart.map((c) => ({
@@ -135,7 +139,6 @@ export default function Billing() {
     }
   };
 
-  // --- PDF Generator ---
   const generatePDFFile = (dataToPrint) => {
     const doc = new jsPDF({
         orientation: 'portrait',
@@ -148,12 +151,13 @@ export default function Billing() {
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(shop.name || "Shop Name", 40, 8, { align: "center" });
+    // Use updated shop state
+    doc.text(currentShop.name || "Shop Name", 40, 8, { align: "center" });
     
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    doc.text(shop.address || "", 40, 12, { align: "center" });
-    doc.text(`Ph: ${shop.contact_phone || ""}`, 40, 16, { align: "center" });
+    doc.text(currentShop.address || "", 40, 12, { align: "center" });
+    doc.text(`Ph: ${currentShop.contact_phone || ""}`, 40, 16, { align: "center" });
 
     doc.line(4, 18, 76, 18); 
 
@@ -237,7 +241,7 @@ export default function Billing() {
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({
                 files: [file],
-                title: `Bill from ${shop.name}`,
+                title: `Bill from ${currentShop.name}`,
                 text: `Hello ${invoiceData?.customer_name}, here is your invoice.`,
             });
         } else {
@@ -262,11 +266,9 @@ export default function Billing() {
   };
 
   return (
-    // Background adjusted to a cleaner Slate-50 with large padding bottom for scroll
     <div className="bg-slate-50 min-h-screen pb-44 font-sans text-slate-800">
       
-      {/* --- Glassmorphism Header --- */}
-      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm transition-all">
+      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm transition-all mt-[2px] lg:mt-0">
         <div className="px-5 py-3 flex justify-between items-center">
             <h1 className="font-extrabold text-slate-800 text-xl tracking-tight flex items-center gap-2">
                New Sale
@@ -276,7 +278,6 @@ export default function Billing() {
             </button>
         </div>
         
-        {/* Customer Form Area */}
         <div className="px-4 pb-2">
             <div className="flex gap-3 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200">
                 <input 
@@ -297,7 +298,6 @@ export default function Billing() {
             </div>
         </div>
 
-        {/* Search Bar */}
         <div className="px-4 pb-4">
             <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors group-focus-within:text-indigo-500">
@@ -315,7 +315,6 @@ export default function Billing() {
         </div>
       </div>
 
-      {/* --- Product Grid --- */}
       <div className="p-4 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {(products || [])
@@ -323,7 +322,6 @@ export default function Billing() {
                 .map((p) => {
                     const inCart = cart.find(c => c.id === p.id);
                     return (
-                        // Card Design Refined
                         <div 
                             key={p.id} 
                             onClick={() => addToCart(p)} 
@@ -368,8 +366,6 @@ export default function Billing() {
         </div>
       </div>
 
-      {/* --- Floating Checkout Bar --- */}
-      {/* Positioned higher to clear Nav */}
       {cart.length > 0 && !isCartOpen && (
         <div className="fixed bottom-24 md:bottom-8 left-4 right-4 z-30 animate-slide-up-fade">
             <button 
@@ -389,18 +385,14 @@ export default function Billing() {
         </div>
       )}
 
-      {/* --- Cart Drawer (Sheet) --- */}
-      {/* High Z-index and bottom padding for Nav */}
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm pb-20 sm:pb-0 transition-opacity">
             <div className="bg-white w-full sm:w-[500px] sm:rounded-2xl rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up">
                 
-                {/* Drag Handle for Mobile */}
                 <div className="w-full flex justify-center pt-3 pb-1 sm:hidden cursor-pointer" onClick={() => setIsCartOpen(false)}>
                     <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
                 </div>
                 
-                {/* Modal Header */}
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-3xl">
                     <div>
                         <h2 className="text-xl font-extrabold text-slate-800">Current Bill</h2>
@@ -411,7 +403,6 @@ export default function Billing() {
                     </button>
                 </div>
 
-                {/* Cart Items List */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-5">
                     {cart.map((item) => (
                         <div key={item.id} className="flex justify-between items-center group">
@@ -420,7 +411,6 @@ export default function Billing() {
                                 <div className="text-xs font-medium text-slate-500 bg-slate-100 inline-block px-2 py-0.5 rounded">₹{item.price} / unit</div>
                             </div>
                             
-                            {/* Quantity Controls */}
                             <div className="flex items-center gap-3">
                                 <button 
                                     onClick={() => updateQty(item.id, item.qty - 1)} 
@@ -442,7 +432,6 @@ export default function Billing() {
                     ))}
                 </div>
 
-                {/* Footer / Total */}
                 <div className="p-6 bg-slate-50 border-t border-slate-100 sm:rounded-b-2xl">
                     <div className="space-y-2 mb-6">
                         <div className="flex justify-between text-sm text-slate-500">
@@ -470,12 +459,10 @@ export default function Billing() {
         </div>
       )}
 
-      {/* --- Success Modal --- */}
       {showSuccessModal && invoiceData && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
               <div className="bg-white w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl animate-pop-in relative overflow-hidden">
                   
-                  {/* Decorative Confetti Circles */}
                   <div className="absolute top-0 left-0 w-32 h-32 bg-green-50 rounded-full -translate-x-10 -translate-y-10 z-0"></div>
                   <div className="absolute bottom-0 right-0 w-24 h-24 bg-indigo-50 rounded-full translate-x-8 translate-y-8 z-0"></div>
 
@@ -515,7 +502,6 @@ export default function Billing() {
           </div>
       )}
 
-      {/* --- CSS FOR THERMAL PRINTING (80mm) --- */}
       <style>{`
         #printableBillContent { display: none; }
 
@@ -575,14 +561,13 @@ export default function Billing() {
         }
       `}</style>
 
-      {/* --- HTML FOR THERMAL PRINTING --- */}
       <div id="printableBillContent">
         {invoiceData && (
           <>
             <div className="print-header">
-              <h2>{shop.name}</h2>
-              <p>{shop.address}</p>
-              <p>Ph: {shop.contact_phone}</p>
+              <h2>{currentShop.name}</h2>
+              <p>{currentShop.address}</p>
+              <p>Ph: {currentShop.contact_phone}</p>
             </div>
             
             <div className="print-meta-row">

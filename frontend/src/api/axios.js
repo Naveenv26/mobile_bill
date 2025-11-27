@@ -3,6 +3,31 @@ import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
+
+export const getErrorMessage = (error) => {
+  if (!error.response) return "Network error. Please check your connection.";
+  
+  const data = error.response.data;
+  
+  // 1. Standard DRF "detail" error
+  if (data.detail) return data.detail;
+  
+  // 2. Standard DRF "error" key
+  if (data.error) return data.error;
+
+  // 3. Field specific errors (e.g., { "mobile": ["Invalid number"] })
+  const firstKey = Object.keys(data)[0];
+  if (firstKey && Array.isArray(data[firstKey])) {
+    // Capitalize first letter of field name
+    const fieldName = firstKey.charAt(0).toUpperCase() + firstKey.slice(1);
+    return `${fieldName}: ${data[firstKey][0]}`;
+  }
+  
+  // 4. Fallback
+  return "Something went wrong. Please try again.";
+};
+
+
 // This is a simple logout function to be called on critical errors
 export function simpleLogout() {
   localStorage.removeItem("access_token");

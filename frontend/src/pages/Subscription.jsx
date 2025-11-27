@@ -11,7 +11,6 @@ import useRazorpay from '../hooks/useRazorpay';
 import { Check, X, Star, Zap, TrendingUp, Crown, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// --- Plan Configuration (from seed_plans.py) ---
 const iconMap = {
     FREE: Star,
     BASIC: Zap,
@@ -24,7 +23,7 @@ const colorMap = {
         border: 'border-gray-300',
         bg: 'bg-gray-100',
         text: 'text-gray-600',
-        button: 'bg-green-600 hover:bg-green-700', // Green for "Start Trial"
+        button: 'bg-green-600 hover:bg-green-700',
         iconBg: 'bg-gray-200',
     },
     BASIC: {
@@ -50,30 +49,30 @@ const colorMap = {
     },
 };
 
-// --- Helper Components ---
-const Feature = ({ text, included }) => (
+// --- MODIFIED: Highlight prop ---
+const Feature = ({ text, included, highlight }) => (
     <li className="flex items-start">
         {included ? (
-            <Check className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+            <Check className={`w-5 h-5 mr-2 flex-shrink-0 mt-0.5 ${highlight ? 'text-emerald-500' : 'text-green-500'}`} />
         ) : (
             <X className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0 mt-0.5" />
         )}
-        <span className={`text-sm ${included ? 'text-gray-800' : 'text-gray-500'}`}>
+        <span className={`text-sm ${included ? (highlight ? 'text-emerald-700 font-bold' : 'text-gray-800') : 'text-gray-500'}`}>
             {text}
         </span>
     </li>
 );
 
-// --- 💡 MODIFIED PlanCard ---
 const PlanCard = ({ plan, currentPlanType, isSubscribed, onSubscribe, onStartTrial, isProcessing, trialUsed }) => {
     const { plan_type = 'FREE', name, price, duration, features, duration_days } = plan;
     const Icon = iconMap[plan_type] || Star;
     const color = colorMap[plan_type] || colorMap.FREE;
     
-    // A plan is only "Active" if it's the current plan AND the subscription is valid
     const isActive = currentPlanType === plan_type && isSubscribed;
+    
+    // Check for highlight condition
+    const isProOrPremium = ['PRO', 'PREMIUM'].includes(plan_type);
 
-    // Dynamically create feature list from the features object
     const featureList = [
         { text: 'Dashboard Access', included: features?.dashboard },
         { text: 'Stock Maintenance', included: features?.stock },
@@ -81,8 +80,12 @@ const PlanCard = ({ plan, currentPlanType, isSubscribed, onSubscribe, onStartTri
         { text: `Max ${features?.max_bills_per_week === -1 ? 'Unlimited' : (features?.max_bills_per_week + ' Bills/Week')}`, included: features?.billing },
         { text: 'Sales Reports', included: features?.reports },
         { text: 'Excel Export', included: features?.export },
-        // ADDED WHATSAPP TALLY REPORT DESCRIPTION
-        { text: 'WhatsApp Reports (Tally/Amount)', included: features?.whatsapp_reports }, 
+        // --- GREEN HIGHLIGHT ---
+        { 
+            text: 'WhatsApp Reports (Tally/Amount)', 
+            included: features?.whatsapp_reports,
+            highlight: isProOrPremium && features?.whatsapp_reports 
+        }, 
     ];
 
     const handleAction = () => {
@@ -99,7 +102,6 @@ const PlanCard = ({ plan, currentPlanType, isSubscribed, onSubscribe, onStartTri
         if (plan_type === 'FREE') {
             return trialUsed ? 'Trial Used' : 'Start 7-Day Trial';
         }
-        // If it's the user's plan but it's expired, show "Renew"
         if (currentPlanType === plan_type && !isSubscribed) {
             return "Renew Plan";
         }
@@ -107,10 +109,7 @@ const PlanCard = ({ plan, currentPlanType, isSubscribed, onSubscribe, onStartTri
     };
 
     return (
-        <div
-            className={`relative rounded-2xl shadow-lg border-2 hover:shadow-xl transition-all duration-300 p-6 ${color.border} ${color.bg} ${isActive ? 'ring-2 ring-green-500' : ''}`}
-        >
-            {/* Re-introducing the "Most Popular" badge for PRO */}
+        <div className={`relative rounded-2xl shadow-lg border-2 hover:shadow-xl transition-all duration-300 p-6 ${color.border} ${color.bg} ${isActive ? 'ring-2 ring-green-500' : ''}`}>
             {plan_type === 'PRO' && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                     <span className="bg-purple-600 text-white px-4 py-1 text-xs font-semibold rounded-full shadow">
@@ -144,7 +143,7 @@ const PlanCard = ({ plan, currentPlanType, isSubscribed, onSubscribe, onStartTri
             </div>
 
             <ul className="space-y-3 mb-8">
-                {featureList.map((f, i) => f.text && f.included !== undefined && <Feature key={i} text={f.text} included={f.included} />)}
+                {featureList.map((f, i) => f.text && f.included !== undefined && <Feature key={i} text={f.text} included={f.included} highlight={f.highlight} />)}
             </ul>
 
             <button
@@ -165,40 +164,32 @@ const PlanCard = ({ plan, currentPlanType, isSubscribed, onSubscribe, onStartTri
     );
 };
 
-// --- Main Paywall Modal Component ---
 const SubscriptionModal = () => {
     const { isModalOpen, closeModal, subscription, isSubscribed, refetchSubscription } = useSubscription();
     const [plans, setPlans] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     
-    const isRazorpayLoaded = useRazorpay(); // Load the Razorpay script
+    const isRazorpayLoaded = useRazorpay();
 
-    // Get current subscription details from context
     const currentPlanType = subscription?.plan_type || 'FREE';
     const isTrial = subscription?.is_trial;
     const daysRemaining = subscription?.days_remaining;
     const trialUsed = subscription?.trial_used || false;
 
     useEffect(() => {
-        // Only fetch plans when the modal is opened
         if (isModalOpen) {
             setIsLoading(true);
             getSubscriptionPlans()
                 .then(data => {
-                    // Filter to include FREE, BASIC (MONTHLY), and PRO (MONTHLY)
                     const filteredPlans = data.filter(p => 
                         p.plan_type === 'FREE' || 
                         (p.duration === 'MONTHLY' && (p.plan_type === 'BASIC' || p.plan_type === 'PRO'))
                     );
-                    
-                    // Sort plans: FREE, then BASIC, then PRO
                     const planOrder = { 'FREE': 1, 'BASIC': 2, 'PRO': 3 };
-                    
                     const sortedData = filteredPlans.sort((a, b) => 
                         (planOrder[a.plan_type] || 99) - (planOrder[b.plan_type] || 99)
                     );
-                    
                     setPlans(sortedData);
                 })
                 .catch(err => {
@@ -207,9 +198,7 @@ const SubscriptionModal = () => {
                 })
                 .finally(() => setIsLoading(false));
         }
-    }, [isModalOpen]); // Re-run only when modal is opened
-
-    // --- Action Handlers (Kept unchanged) ---
+    }, [isModalOpen]);
 
     const handleStartTrial = async () => {
         if (trialUsed) {
@@ -220,8 +209,8 @@ const SubscriptionModal = () => {
         try {
             await startFreeTrial();
             toast.success("Free trial started!");
-            await refetchSubscription(); // Refresh context
-            closeModal(); // Close modal on success
+            await refetchSubscription();
+            closeModal();
         } catch (err) {
             console.error("Trial start failed:", err);
             toast.error(err.response?.data?.error || "Failed to start trial.");
@@ -237,13 +226,10 @@ const SubscriptionModal = () => {
         }
         
         setIsProcessing(true);
-        let orderData;
         try {
-            // 1. Create Order from our backend
-            orderData = await createRazorpayOrder(plan.id);
+            const orderData = await createRazorpayOrder(plan.id);
             if (!orderData || !orderData.order_id) throw new Error("Failed to create order");
 
-            // 2. Open Razorpay Checkout
             const options = {
                 key: orderData.key,
                 amount: orderData.amount,
@@ -252,7 +238,6 @@ const SubscriptionModal = () => {
                 description: `Payment for ${plan.name}`,
                 order_id: orderData.order_id,
                 handler: async (response) => {
-                    // 3. Verify Payment with our backend
                     try {
                         await verifyRazorpayPayment({
                             razorpay_order_id: response.razorpay_order_id,
@@ -261,9 +246,8 @@ const SubscriptionModal = () => {
                         });
                         
                         toast.success("Payment successful! Subscription activated.");
-                        await refetchSubscription(); // Refresh context
-                        closeModal(); // Close the modal
-                        
+                        await refetchSubscription();
+                        closeModal();
                     } catch (verifyErr) {
                         console.error("Verification failed:", verifyErr);
                         toast.error("Payment verification failed. Please contact support.");
@@ -275,9 +259,7 @@ const SubscriptionModal = () => {
                     name: orderData.user_name || "Valued Customer",
                     email: orderData.user_email || "",
                 },
-                theme: {
-                    color: "#4f46e5", // Indigo
-                },
+                theme: { color: "#4f46e5" },
                 modal: {
                     ondismiss: () => {
                         setIsProcessing(false);
@@ -297,49 +279,32 @@ const SubscriptionModal = () => {
         }
     };
 
-    // If the modal isn't open, render nothing
-    if (!isModalOpen) {
-        return null;
-    }
+    if (!isModalOpen) return null;
 
-    // --- Render the Modal ---
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-start p-2 md:p-4 pt-4 md:pt-10">
             <div className="bg-gradient-to-br from-gray-50 to-gray-200 p-4 md:p-6 rounded-2xl shadow-2xl max-w-full sm:max-w-4xl w-full max-h-[95vh] overflow-y-auto relative">
-                
-                {/* Close Button */}
-                <button 
-                    onClick={closeModal} 
-                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1"
-                >
+                <button onClick={closeModal} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1">
                     <X size={24} />
                 </button>
 
-                {/* Header */}
                 <div className="text-center mb-6 md:mb-8">
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">Subscription Plans</h1>
                     <p className="text-base text-gray-600">Choose the best plan for your business</p>
-                    
                     {subscription && (isTrial || trialUsed) && daysRemaining <= 0 && !isSubscribed && (
-                        <p className="text-base text-red-600 font-semibold mt-2">
-                            Your trial has expired. Please upgrade to continue.
-                        </p>
+                        <p className="text-base text-red-600 font-semibold mt-2">Your trial has expired. Please upgrade to continue.</p>
                     )}
                     {subscription && isTrial && daysRemaining > 0 && (
-                        <p className="text-base text-green-600 font-semibold mt-2">
-                            You are on a free trial. {daysRemaining} {daysRemaining > 1 ? 'days' : 'day'} remaining.
-                        </p>
+                        <p className="text-base text-green-600 font-semibold mt-2">You are on a free trial. {daysRemaining} {daysRemaining > 1 ? 'days' : 'day'} remaining.</p>
                     )}
                 </div>
 
-                {/* Plan Cards */}
                 {isLoading ? (
                     <div className="flex justify-center items-center h-48">
                         <Loader2 className="w-10 h-10 text-purple-600 animate-spin" />
                         <p className="ml-4 text-gray-600">Loading plans...</p>
                     </div>
                 ) : (
-                    // Forces 1 column on mobile (sm), 2 columns on sm/md screens, and 3 columns (FREE, BASIC, PRO) on large screens
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {plans.map((plan) => (
                             <PlanCard
@@ -354,7 +319,6 @@ const SubscriptionModal = () => {
                             />
                         ))}
                         
-                        {/* PREMIUM Plan Contact Card (Takes full width on sm/md, remains at the end on lg) */}
                         <div className="p-6 bg-slate-100 rounded-2xl border-2 border-slate-300 text-center flex flex-col justify-center items-center col-span-1 sm:col-span-2 lg:col-span-1">
                             <h4 className="font-bold text-lg text-slate-800 flex items-center mb-2">
                                 <Crown className="w-5 h-5 mr-2 text-slate-600" />

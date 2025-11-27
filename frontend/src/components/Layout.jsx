@@ -27,19 +27,30 @@ export default function Layout({ children }) {
         openModal,
         subscription,
         loading: isSubscriptionLoading,
-        hasFeature, // <--- 1. Import hasFeature to check permissions
+        hasFeature, 
     } = useSubscription();
 
-    // --- Logout Function ---
     const logout = () => {
         authLogout();
         navigate("/login");
     };
 
-    // --- Fetch User and Shop Info ---
-    useEffect(() => {
-        api
-            .get("/me/")
+    // --- NEW: Centralized Shop Data Fetching ---
+    const fetchShopData = () => {
+        // 1. Try local storage first for instant render (including logo if saved there)
+        const cached = localStorage.getItem("shop");
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                setShopData(parsed);
+                setShopName(parsed.name || "My Shop");
+            } catch (e) {
+                console.error("Error parsing shop data", e);
+            }
+        }
+
+        // 2. Then fetch fresh data from API
+        api.get("/me/")
             .then((res) => {
                 const { user, shop } = res.data;
                 if (shop) {
@@ -56,24 +67,32 @@ export default function Layout({ children }) {
                     logout();
                 }
             });
+    };
+
+    useEffect(() => {
+        fetchShopData();
+
+        // --- Listen for 'shop-updated' event to refresh immediately ---
+        const handleShopUpdate = () => fetchShopData();
+        window.addEventListener('shop-updated', handleShopUpdate);
+
+        return () => window.removeEventListener('shop-updated', handleShopUpdate);
     }, [navigate]);
 
     // --- Navigation Configuration ---
-    // 2. Added 'feature' key to links. If a user's plan doesn't have this feature set to true, the link won't show.
     const links = [
         { name: "Home", path: "/dashboard", icon: LayoutDashboard, feature: "dashboard" },
         { name: "Bill", path: "/billing", icon: ReceiptText, feature: "billing" },
-        { name: "Reports", path: "/reports", icon: BarChart3, feature: "reports" }, // This will hide for Free plans
+        { name: "Reports", path: "/reports", icon: BarChart3, feature: "reports" },
         { name: "Stock", path: "/stock", icon: Package, feature: "stock" },
-        { name: "Settings", path: "/settings", icon: Settings, feature: "dashboard" }, // Accessible to everyone
+        { name: "Settings", path: "/settings", icon: Settings, feature: "dashboard" },
     ];
 
-    // --- Navbar Badge (Trial/Status/Subscribed) ---
+    // --- Navbar Badge ---
     const getSubscriptionStatusButton = () => {
         if (isSubscriptionLoading) return null;
         
         let text, icon, style;
-        
         const baseStyle = "ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wide cursor-pointer transition-all duration-200";
 
         if (subscription?.is_trial && subscription?.days_remaining > 0) {
@@ -91,11 +110,7 @@ export default function Layout({ children }) {
         }
         
         return (
-            <button 
-                onClick={openModal} 
-                className={`${baseStyle} ${style}`}
-                aria-label={`Subscription status: ${text}`}
-            >
+            <button onClick={openModal} className={`${baseStyle} ${style}`}>
                 {icon}{text}
             </button>
         );
@@ -125,14 +140,17 @@ export default function Layout({ children }) {
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
             
-            {/* --- Sidebar (Desktop Only) --- */}
+            {/* --- NEW: 2px Black Top Bar (Mobile Status Bar Fix) --- */}
+            <div className="fixed top-0 left-0 right-0 h-[2px] bg-black z-[100] lg:hidden"></div>
+
+            {/* Sidebar (Desktop) */}
             <aside className="hidden lg:flex flex-col w-72 bg-slate-900 text-white border-r border-slate-800">
-                {/* Header */}
                 <div className="p-6 border-b border-slate-800">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg overflow-hidden">
+                            {/* Check shopData.logo (from DB) or local storage fallback */}
                             {shopData?.logo ? (
-                                <img src={shopData.logo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+                                <img src={shopData.logo} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
                                 <span className="text-lg font-bold text-white">{shopName.charAt(0)}</span>
                             )}
@@ -144,34 +162,27 @@ export default function Layout({ children }) {
                     </div>
                 </div>
 
-                {/* Nav Links */}
                 <nav className="flex-1 px-4 py-6 space-y-2">
                     {links
-                        // 3. FILTER: Only show links if the user has the feature enabled
                         .filter(link => !link.feature || hasFeature(link.feature))
                         .map((link) => (
                             <DesktopNavItem key={link.path} link={link} />
                     ))}
                 </nav>
 
-                {/* Logout Footer */}
                 <div className="p-4 border-t border-slate-800">
-                    <button
-                        onClick={logout}
-                        className="flex items-center w-full px-4 py-3 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 rounded-xl transition-colors text-sm font-medium"
-                    >
+                    <button onClick={logout} className="flex items-center w-full px-4 py-3 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 rounded-xl transition-colors text-sm font-medium">
                         <LogOut className="w-5 h-5 mr-3" />
                         Logout Session
                     </button>
                 </div>
             </aside>
 
-            {/* --- Main Content Wrapper --- */}
+            {/* Main Content */}
             <div className="flex-1 flex flex-col h-full relative">
                 
-                {/* --- Top Header (Mobile & Desktop) --- */}
-                <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between shrink-0 z-20">
-                    {/* Left: Branding or Page Title */}
+                {/* Top Header (Push down by 2px on mobile via margin-top) */}
+                <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between shrink-0 z-20 mt-[2px] lg:mt-0">
                     <div className="flex items-center gap-2">
                         <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                             SmartBill
@@ -179,9 +190,7 @@ export default function Layout({ children }) {
                         {getSubscriptionStatusButton()}
                     </div>
 
-                    {/* Right: Shop Profile */}
                     <div className="flex items-center gap-3">
-                        {/* Shop Info Display */}
                         <div className="flex items-center gap-2 pl-4 border-l border-slate-100">
                             <div className="text-right hidden sm:block">
                                 <p className="text-sm font-semibold text-slate-800 max-w-[120px] truncate">{shopName}</p>
@@ -198,16 +207,15 @@ export default function Layout({ children }) {
                     </div>
                 </header>
 
-                {/* --- Page Scrollable Area --- */}
+                {/* Page Scrollable Area */}
                 <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 pb-24 lg:pb-6 p-4 sm:p-6">
                     {children}
                 </main>
 
-                {/* --- Bottom Navigation (Mobile Only) --- */}
+                {/* Bottom Navigation (Mobile Only) */}
                 <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-2 z-50 pb-safe">
                     <div className="flex items-center justify-between">
                         {links
-                            // 4. FILTER: Same filter for mobile menu
                             .filter(link => !link.feature || hasFeature(link.feature))
                             .map((link) => {
                                 const Icon = link.icon;

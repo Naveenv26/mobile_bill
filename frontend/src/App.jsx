@@ -1,8 +1,10 @@
+// frontend/src/App.jsx
 import React from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { SubscriptionProvider } from "./context/SubscriptionContext";
+import { SubscriptionProvider, useSubscription } from "./context/SubscriptionContext";
 import SubscriptionModal from "./pages/Subscription";
+import GlobalLoader from "./components/GlobalLoader";
 
 // Import Pages
 import Login from "./pages/Login";
@@ -25,23 +27,20 @@ const LayoutWrapper = () => (
   </Layout>
 );
 
-export default function App() {
-  return (
-    <SubscriptionProvider>
-      {/* Toast Notifications */}
-      <Toaster position="bottom-right" toastOptions={{
-        duration: 4000,
-        style: { background: '#333', color: '#fff' },
-      }} />
+// --- NEW: MainLayout Component to handle Global Loading ---
+const MainContent = () => {
+  const { loading } = useSubscription();
 
+  if (loading) {
+    return <GlobalLoader />;
+  }
+
+  return (
+    <>
       <Routes>
-        {/* --- Public Routes --- */}
         <Route path="/login" element={<Login />} />
-        
-        {/* Route for the link sent via email: /reset-password/uid/token */}
         <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
 
-        {/* --- Protected Routes (With Sidebar) --- */}
         <Route element={<PrivateRoute><LayoutWrapper /></PrivateRoute>}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
@@ -51,19 +50,30 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
         </Route>
 
-        {/* --- Setup Route (Protected, No Sidebar) --- */}
         <Route path="/setup-shop" element={
           <PrivateRoute>
             <ShopSetup />
           </PrivateRoute>
         } />
 
-        {/* Fallback for unknown URLs */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-
-      {/* Global Paywall Modal */}
+      
       <SubscriptionModal />
+    </>
+  );
+};
+
+export default function App() {
+  return (
+    <SubscriptionProvider>
+      {/* Updated Toast Style */}
+      <Toaster position="bottom-right" toastOptions={{
+        duration: 4000,
+        style: { background: '#1e293b', color: '#fff', borderRadius: '12px' },
+      }} />
+      
+      <MainContent />
       
     </SubscriptionProvider>
   );
