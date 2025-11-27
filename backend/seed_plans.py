@@ -76,7 +76,7 @@ SubscriptionPlan.objects.create(
         "max_bills_per_week": -1,
         "reports": True,
         "export": True, # Pro Feature
-        "whatsapp_reports": False
+        "whatsapp_reports": True # Pro Feature
     },
     is_active=True
 )

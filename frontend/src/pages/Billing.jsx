@@ -28,16 +28,15 @@ export default function Billing() {
   const [invoiceData, setInvoiceData] = useState(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  // --- NEW: Live Shop Details ---
+  // Live Shop Details
   const [currentShop, setCurrentShop] = useState(
-    JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "" }
+    JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "", config: {} }
   );
 
   const { hasFeature } = useSubscription();
   const nameRef = useRef();
   const searchRef = useRef();
 
-  // --- NEW: Sync shop details listener ---
   useEffect(() => {
     const handleUpdate = () => {
         const updated = JSON.parse(localStorage.getItem("shop"));
@@ -46,6 +45,8 @@ export default function Billing() {
     window.addEventListener('shop-updated', handleUpdate);
     return () => window.removeEventListener('shop-updated', handleUpdate);
   }, []);
+
+  useEffect(() => { loadProducts(); }, []);
 
   const loadProducts = async () => {
     try {
@@ -67,8 +68,6 @@ export default function Billing() {
     }
   };
 
-  useEffect(() => { loadProducts(); }, []);
-
   const addToCart = (p) => {
     setCart((prev) => {
       const found = prev.find((c) => c.id === p.id);
@@ -83,7 +82,6 @@ export default function Billing() {
         </div>
       </div>
     ), { duration: 1000 });
-
     setSearch(""); 
     searchRef.current?.focus();
   };
@@ -107,7 +105,7 @@ export default function Billing() {
 
     try {
       const payload = {
-        shop: currentShop.id, // Use updated shop state
+        shop: currentShop.id,
         customer_name: customerName || "Walk-in",
         customer_mobile: customerMobile || "",
         items: cart.map((c) => ({
@@ -139,19 +137,12 @@ export default function Billing() {
     }
   };
 
-  const generatePDFFile = (dataToPrint) => {
-    const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [80, 200] 
-    });
+  // --- PDF LOGIC STARTS HERE ---
 
-    const printData = dataToPrint || invoiceData;
-    if (!printData) return;
-
+  // Helper: Generate 80mm Thermal Receipt
+  const generateThermalPDF = (doc, printData) => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    // Use updated shop state
     doc.text(currentShop.name || "Shop Name", 40, 8, { align: "center" });
     
     doc.setFontSize(7);
@@ -166,8 +157,6 @@ export default function Billing() {
     const rightX = 76; 
     
     doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-
     doc.text(`Name: ${printData.customer_name || "Walk-in"}`, leftX, y, { align: "left" });
     doc.text(`${new Date().toLocaleDateString()}`, rightX, y, { align: "right" });
     y += 5;
@@ -183,11 +172,7 @@ export default function Billing() {
     (printData.items || []).forEach(item => {
       const name = item.product_name || item.name || "Item";
       const displayName = name.length > 12 ? name.substring(0, 12) + ".." : name;
-      const qty = item.qty;
-      const price = item.unit_price || item.price;
-      const total = qty * price;
-
-      tableRows.push([displayName, qty, Math.round(price), Math.round(total)]);
+      tableRows.push([displayName, item.qty, Math.round(item.unit_price), Math.round(item.qty * item.unit_price)]);
     });
 
     autoTable(doc, {
@@ -207,17 +192,13 @@ export default function Billing() {
     });
 
     let finalY = doc.lastAutoTable.finalY + 5;
-    
     doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    
     const subTotalAmt = Number(printData.subtotal || printData.total_amount || 0); 
-    const taxAmt = Number(printData.tax_total || (printData.grand_total - subTotalAmt) || 0);
+    const taxAmt = Number(printData.tax_total || 0);
     const grandTotal = Number(printData.grand_total || 0);
 
     doc.text(`Subtotal: ${subTotalAmt.toFixed(2)}`, 76, finalY, { align: "right" });
     finalY += 4;
-
     doc.text(`Tax: ${taxAmt.toFixed(2)}`, 76, finalY, { align: "right" });
     finalY += 5;
 
@@ -228,6 +209,108 @@ export default function Billing() {
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");
     doc.text("*** Thank You Visit Again ***", 40, finalY + 8, { align: "center" });
+  };
+
+  // Helper: Generate A4 Standard Invoice
+  const generateA4PDF = (doc, printData) => {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text("INVOICE", pageWidth - margin, 20, { align: "right" });
+
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    doc.text(currentShop.name || "Shop Name", margin, 20);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(currentShop.address || "", margin, 26);
+    doc.text(`Phone: ${currentShop.contact_phone || ""}`, margin, 31);
+    if (currentShop.contact_email) doc.text(currentShop.contact_email, margin, 36);
+
+    doc.line(margin, 42, pageWidth - margin, 42);
+
+    // Bill To & Invoice Details
+    const startY = 55;
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Bill To:", margin, startY);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(printData.customer_name || "Walk-in Customer", margin, startY + 6);
+    if(printData.customer_mobile) doc.text(printData.customer_mobile, margin, startY + 11);
+
+    doc.text(`Invoice No: ${printData.number || printData.id}`, pageWidth - margin, startY, { align: "right" });
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin, startY + 6, { align: "right" });
+
+    // Table
+    const tableColumn = ["#", "Item Name", "Price", "Qty", "Tax %", "Total"];
+    const tableRows = [];
+
+    (printData.items || []).forEach((item, i) => {
+      const price = Number(item.unit_price);
+      const total = Number(item.qty) * price;
+      tableRows.push([
+          i + 1,
+          item.product_name || item.name,
+          price.toFixed(2),
+          item.qty,
+          item.tax_rate + "%",
+          total.toFixed(2)
+      ]);
+    });
+
+    autoTable(doc, {
+      startY: startY + 20,
+      head: [tableColumn],
+      body: tableRows,
+      headStyles: { fillColor: [30, 41, 59], textColor: 255 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: margin, right: margin }
+    });
+
+    // Totals
+    const finalY = doc.lastAutoTable.finalY + 10;
+    const rightAlign = pageWidth - margin;
+
+    doc.text(`Subtotal:`, rightAlign - 40, finalY, { align: "right" });
+    doc.text(`${Number(printData.subtotal || printData.total_amount).toFixed(2)}`, rightAlign, finalY, { align: "right" });
+    
+    doc.text(`Tax:`, rightAlign - 40, finalY + 6, { align: "right" });
+    doc.text(`${Number(printData.tax_total || 0).toFixed(2)}`, rightAlign, finalY + 6, { align: "right" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(`Grand Total:`, rightAlign - 40, finalY + 14, { align: "right" });
+    doc.text(`Rs. ${Number(printData.grand_total).toFixed(2)}`, rightAlign, finalY + 14, { align: "right" });
+
+    // Footer
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(150, 150, 150);
+    doc.text("Thank you for your business!", pageWidth / 2, 280, { align: "center" });
+  };
+
+  const generatePDFFile = (dataToPrint) => {
+    const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
+    const isA4 = paperSize === "A4";
+
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: isA4 ? 'a4' : [80, 200]
+    });
+
+    if (isA4) {
+        generateA4PDF(doc, dataToPrint || invoiceData);
+    } else {
+        generateThermalPDF(doc, dataToPrint || invoiceData);
+    }
 
     return doc.output('blob');
   };
@@ -246,7 +329,8 @@ export default function Billing() {
             });
         } else {
              toast("Sharing not supported. Opening print dialog.");
-             window.print(); 
+             const url = URL.createObjectURL(pdfBlob);
+             window.open(url, "_blank");
         }
     } catch (error) {
         console.error("Sharing failed", error);
@@ -489,8 +573,12 @@ export default function Billing() {
                             {isGeneratingPDF ? 'Generating...' : <><ShareIcon /> Share on WhatsApp</>}
                         </button>
                         
-                        <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3.5 rounded-xl font-bold transition-colors">
-                            Print Thermal Bill
+                        <button onClick={() => {
+                             const blob = generatePDFFile(invoiceData);
+                             const url = URL.createObjectURL(blob);
+                             window.open(url, "_blank");
+                        }} className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3.5 rounded-xl font-bold transition-colors">
+                            Print Bill
                         </button>
                         
                         <button onClick={resetBilling} className="block w-full text-center mt-4 text-slate-400 text-sm font-semibold hover:text-indigo-600 transition-colors">
@@ -501,126 +589,6 @@ export default function Billing() {
               </div>
           </div>
       )}
-
-      <style>{`
-        #printableBillContent { display: none; }
-
-        @media print {
-            @page {
-                size: 80mm auto; 
-                margin: 0;      
-            }
-
-            body * { visibility: hidden; }
-            
-            #printableBillContent, #printableBillContent * {
-                visibility: visible;
-            }
-            
-            #printableBillContent {
-                display: block !important;
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 80mm; 
-                padding: 6mm 4mm; 
-                box-sizing: border-box; 
-                font-family: 'Courier New', monospace; 
-                font-size: 11px;
-                line-height: 1.2;
-                background: white;
-            }
-
-            .print-header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 5px; }
-            .print-header h2 { margin: 0; font-size: 16px; font-weight: bold; text-transform: uppercase; }
-            .print-header p { margin: 2px 0; font-size: 11px; }
-
-            .print-meta-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
-
-            .print-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-            .print-table th { 
-                border-bottom: 1px dashed #000; 
-                border-top: 1px dashed #000;
-                text-align: left; 
-                padding: 4px 0;
-                font-size: 10px;
-                text-transform: uppercase;
-            }
-            .print-table td { padding: 4px 0; vertical-align: top; }
-            
-            .print-table th:nth-child(1), .print-table td:nth-child(1) { width: 40%; text-align: left; }
-            .print-table th:nth-child(2), .print-table td:nth-child(2) { width: 15%; text-align: center; }
-            .print-table th:nth-child(3), .print-table td:nth-child(3) { width: 20%; text-align: right; padding-right: 2mm; }
-            .print-table th:nth-child(4), .print-table td:nth-child(4) { width: 25%; text-align: right; }
-
-            .print-breakdown { margin-top: 5px; border-top: 1px dashed #000; padding-top: 5px; }
-            .print-breakdown-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-            .print-breakdown-row.total { font-size: 14px; font-weight: bold; margin-top: 8px; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 5px 0; }
-
-            .print-footer { text-align: center; margin-top: 15px; font-size: 10px; font-style: italic; }
-        }
-      `}</style>
-
-      <div id="printableBillContent">
-        {invoiceData && (
-          <>
-            <div className="print-header">
-              <h2>{currentShop.name}</h2>
-              <p>{currentShop.address}</p>
-              <p>Ph: {currentShop.contact_phone}</p>
-            </div>
-            
-            <div className="print-meta-row">
-                <span>Name: {invoiceData.customer_name.substring(0, 15)}</span>
-                <span>{new Date().toLocaleDateString()}</span>
-            </div>
-            <div className="print-meta-row">
-                <span>{invoiceData.customer_mobile ? `Mob: ${invoiceData.customer_mobile}` : ''}</span>
-                <span>#{invoiceData.number || invoiceData.id}</span>
-            </div>
-
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Qty</th>
-                  <th>Price</th>
-                  <th>Tot</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(invoiceData.items || []).map((it, idx) => (
-                  <tr key={idx}>
-                    <td>{it.product_name ? it.product_name.substring(0, 18) : "Item"}</td>
-                    <td>{it.qty}</td>
-                    <td>{Number(it.unit_price || it.price).toFixed(2)}</td>
-                    <td>{Number((it.unit_price || it.price) * it.qty).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="print-breakdown">
-                <div className="print-breakdown-row">
-                    <span>Subtotal:</span>
-                    <span>{Number(invoiceData.subtotal || invoiceData.total_amount).toFixed(2)}</span>
-                </div>
-                <div className="print-breakdown-row">
-                    <span>Tax:</span>
-                    <span>{Number(invoiceData.tax_total || 0).toFixed(2)}</span>
-                </div>
-                <div className="print-breakdown-row total">
-                    <span>TOTAL:</span>
-                    <span>Rs. {Number(invoiceData.grand_total).toFixed(2)}</span>
-                </div>
-            </div>
-
-            <div className="print-footer">
-              *** Thank You Visit Again ***
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
