@@ -140,8 +140,8 @@ export default function Layout({ children }) {
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
             
-            {/* --- NEW: 2px Black Top Bar (Mobile Status Bar Fix) --- */}
-            <div className="fixed top-0 left-0 right-0 h-[2px] bg-black z-[100] lg:hidden"></div>
+            {/* --- UPDATED: 0.5cm Black Top Bar --- */}
+            <div className="fixed top-0 left-0 right-0 h-[0.5cm] bg-black z-[100] lg:hidden"></div>
 
             {/* Sidebar (Desktop) */}
             <aside className="hidden lg:flex flex-col w-72 bg-slate-900 text-white border-r border-slate-800">
@@ -181,8 +181,8 @@ export default function Layout({ children }) {
             {/* Main Content */}
             <div className="flex-1 flex flex-col h-full relative">
                 
-                {/* Top Header (Push down by 2px on mobile via margin-top) */}
-                <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between shrink-0 z-20 mt-[2px] lg:mt-0">
+                {/* --- UPDATED: Header Margin (mt-[0.5cm]) --- */}
+                <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between shrink-0 z-20 mt-[0.5cm] lg:mt-0">
                     <div className="flex items-center gap-2">
                         <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                             SmartBill
