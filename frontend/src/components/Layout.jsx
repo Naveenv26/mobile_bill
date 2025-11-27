@@ -27,7 +27,7 @@ export default function Layout({ children }) {
         openModal,
         subscription,
         loading: isSubscriptionLoading,
-        hasFeature, // We use this to check if a link should be shown
+        // hasFeature is no longer needed for the menu logic
     } = useSubscription();
 
     const logout = () => {
@@ -75,14 +75,13 @@ export default function Layout({ children }) {
     }, [navigate]);
 
     // --- Navigation Configuration ---
-    // "Home" and "Settings" have NO feature prop, so they will ALWAYS show.
-    // "Reports" has 'feature: "reports"', so it will strictly obey the plan's limits.
+    // FIX: Removed 'feature' keys so they are treated as public links
     const links = [
-        { name: "Home", path: "/dashboard", icon: LayoutDashboard }, 
-        { name: "Bill", path: "/billing", icon: ReceiptText, feature: "billing" },
-        { name: "Reports", path: "/reports", icon: BarChart3, feature: "reports" },
-        { name: "Stock", path: "/stock", icon: Package, feature: "stock" },
-        { name: "Settings", path: "/settings", icon: Settings }, 
+        { name: "Home", path: "/dashboard", icon: LayoutDashboard },
+        { name: "Bill", path: "/billing", icon: ReceiptText },
+        { name: "Reports", path: "/reports", icon: BarChart3 },
+        { name: "Stock", path: "/stock", icon: Package },
+        { name: "Settings", path: "/settings", icon: Settings },
     ];
 
     // --- Navbar Badge ---
@@ -137,7 +136,7 @@ export default function Layout({ children }) {
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
             
-            {/* Top Bar (Mobile Fix) */}
+            {/* --- Top Bar (Mobile Fix) --- */}
             <div className="fixed top-0 left-0 right-0 h-[0.5cm] bg-black z-[100] lg:hidden"></div>
 
             {/* Sidebar (Desktop) */}
@@ -158,12 +157,10 @@ export default function Layout({ children }) {
                     </div>
                 </div>
 
+                {/* FIX: Removed .filter() here so links always render */}
                 <nav className="flex-1 px-4 py-6 space-y-2">
-                    {/* FILTER APPLIED: Show if link has no feature OR user has that feature */}
-                    {links
-                        .filter(link => !link.feature || hasFeature(link.feature))
-                        .map((link) => (
-                            <DesktopNavItem key={link.path} link={link} />
+                    {links.map((link) => (
+                        <DesktopNavItem key={link.path} link={link} />
                     ))}
                 </nav>
 
@@ -211,10 +208,8 @@ export default function Layout({ children }) {
                 {/* Bottom Navigation (Mobile Only) */}
                 <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-2 z-50 pb-safe">
                     <div className="flex items-center justify-between">
-                        {/* FILTER APPLIED HERE TOO */}
-                        {links
-                            .filter(link => !link.feature || hasFeature(link.feature))
-                            .map((link) => {
+                        {/* FIX: Removed .filter() here as well */}
+                        {links.map((link) => {
                                 const Icon = link.icon;
                                 const isActive = location.pathname === link.path || (link.path !== "/dashboard" && location.pathname.startsWith(link.path));
                                 
