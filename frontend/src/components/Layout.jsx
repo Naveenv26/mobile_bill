@@ -35,9 +35,9 @@ export default function Layout({ children }) {
         navigate("/login");
     };
 
-    // --- NEW: Centralized Shop Data Fetching ---
+    // --- Centralized Shop Data Fetching ---
     const fetchShopData = () => {
-        // 1. Try local storage first for instant render (including logo if saved there)
+        // 1. Try local storage first
         const cached = localStorage.getItem("shop");
         if (cached) {
             try {
@@ -49,7 +49,7 @@ export default function Layout({ children }) {
             }
         }
 
-        // 2. Then fetch fresh data from API
+        // 2. Fetch fresh data
         api.get("/me/")
             .then((res) => {
                 const { user, shop } = res.data;
@@ -71,21 +71,19 @@ export default function Layout({ children }) {
 
     useEffect(() => {
         fetchShopData();
-
-        // --- Listen for 'shop-updated' event to refresh immediately ---
         const handleShopUpdate = () => fetchShopData();
         window.addEventListener('shop-updated', handleShopUpdate);
-
         return () => window.removeEventListener('shop-updated', handleShopUpdate);
     }, [navigate]);
 
     // --- Navigation Configuration ---
+    // FIXED: Removed 'feature' requirement for Home and Settings so they always show
     const links = [
-        { name: "Home", path: "/dashboard", icon: LayoutDashboard, feature: "dashboard" },
+        { name: "Home", path: "/dashboard", icon: LayoutDashboard }, // Always visible
         { name: "Bill", path: "/billing", icon: ReceiptText, feature: "billing" },
         { name: "Reports", path: "/reports", icon: BarChart3, feature: "reports" },
         { name: "Stock", path: "/stock", icon: Package, feature: "stock" },
-        { name: "Settings", path: "/settings", icon: Settings, feature: "dashboard" },
+        { name: "Settings", path: "/settings", icon: Settings }, // Always visible
     ];
 
     // --- Navbar Badge ---
@@ -140,7 +138,7 @@ export default function Layout({ children }) {
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
             
-            {/* --- UPDATED: 0.5cm Black Top Bar --- */}
+            {/* Top spacing fix */}
             <div className="fixed top-0 left-0 right-0 h-[0.5cm] bg-black z-[100] lg:hidden"></div>
 
             {/* Sidebar (Desktop) */}
@@ -148,7 +146,6 @@ export default function Layout({ children }) {
                 <div className="p-6 border-b border-slate-800">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg overflow-hidden">
-                            {/* Check shopData.logo (from DB) or local storage fallback */}
                             {shopData?.logo ? (
                                 <img src={shopData.logo} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
@@ -181,7 +178,6 @@ export default function Layout({ children }) {
             {/* Main Content */}
             <div className="flex-1 flex flex-col h-full relative">
                 
-                {/* --- UPDATED: Header Margin (mt-[0.5cm]) --- */}
                 <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between shrink-0 z-20 mt-[0.5cm] lg:mt-0">
                     <div className="flex items-center gap-2">
                         <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -207,7 +203,6 @@ export default function Layout({ children }) {
                     </div>
                 </header>
 
-                {/* Page Scrollable Area */}
                 <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 pb-24 lg:pb-6 p-4 sm:p-6">
                     {children}
                 </main>
