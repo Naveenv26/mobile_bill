@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Shop, SubscriptionPlan, TaxProfile
+from .models import Shop, TaxProfile
+from api.models import SubscriptionPlan
 from accounts.models import User
 from django.contrib.auth.hashers import make_password
 

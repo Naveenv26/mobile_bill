@@ -2,7 +2,7 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-
+from sales.views import invoice_pdf , invoice_whatsapp
 from .views import (
     ResetPasswordView,
     check_subscription,
@@ -12,7 +12,6 @@ from .views import (
     ProductViewSet,
     CustomerViewSet,
     InvoiceViewSet,
-    TaxProfileViewSet,
     ShopViewSet,
     MeViewSet,
     ReportsViewSet,
@@ -24,7 +23,7 @@ from .views import FeedbackViewSet
 from .auth_views import CookieTokenObtainPairView, CookieTokenRefreshView, logout_view
 
 # Shop Registration
-from shops.views import register_shop
+from shops.views import register_shop , TaxProfileViewSet
 
 # Razorpay
 from .razorpay_webhook import razorpay_webhook
@@ -71,7 +70,7 @@ urlpatterns = [
     path("payments/start-trial/", start_trial, name="start-trial"),
     path("payments/history/", payment_history, name="payment-history"),
     path("payments/webhook/", razorpay_webhook, name="razorpay-webhook"),
-
+    path('invoices/<int:invoice_id>/pdf/', invoice_pdf, name='invoice-pdf'),
     # API (router)
     path("", include(router.urls)),
 ]

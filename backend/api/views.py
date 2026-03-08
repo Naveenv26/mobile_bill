@@ -8,6 +8,8 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.db.models import Sum, Count
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 
 # --- 3rd Party Imports ---
 import razorpay
@@ -15,6 +17,7 @@ from rest_framework import viewsets, generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
+from .pagination import SmallPagination, StandardPagination, LargePagination
 
 # --- Local App Imports ---
 # Serializers (from .serializers)
@@ -24,7 +27,6 @@ from .serializers import (
     ProductSerializer,
     CustomerSerializer,
     InvoiceSerializer,
-    TaxProfileSerializer,
     ShopSerializer,
     PaymentSerializer,
     UserSubscriptionSerializer,
@@ -42,7 +44,7 @@ from .models import SubscriptionPlan, Payment, UserSubscription
 from catalog.models import Product
 from customers.models import Customer
 from sales.models import Invoice
-from shops.models import Shop, TaxProfile
+from shops.models import Shop
 
 from .models import Feedback
 from .serializers import FeedbackSerializer
@@ -118,21 +120,25 @@ class ShopFilteredViewSet(viewsets.ModelViewSet):
 class ProductViewSet(ShopFilteredViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-
+    pagination_class = StandardPagination
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['is_active', 'unit']
+    search_fields = ['name', 'sku']
+    ordering_fields = ['name', 'price', 'quantity', 'updated_at']
+    ordering = ['name']
 
 class CustomerViewSet(ShopFilteredViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
+    pagination_class = StandardPagination  
 
 
 class InvoiceViewSet(ShopFilteredViewSet):
     queryset = Invoice.objects.all().order_by('-invoice_date')
     serializer_class = InvoiceSerializer
+    pagination_class = StandardPagination
 
 
-class TaxProfileViewSet(ShopFilteredViewSet):
-    queryset = TaxProfile.objects.all()
-    serializer_class = TaxProfileSerializer
 
 
 class ShopViewSet(viewsets.ModelViewSet):
@@ -230,10 +236,14 @@ def check_subscription(request):
 
     return Response({
         "is_valid": subscription.is_valid(),
-        "expiry_date": subscription.expiry_date,
-        "admin_override": subscription.admin_override,
+        "status": subscription.get_status(),       # "trial" / "active" / "grace" / "expired"
+        "days_remaining": subscription.days_remaining(),
+        "plan": subscription.plan.name if subscription.plan else None,
+        "plan_type": subscription.plan.plan_type if subscription.plan else None,
+        "expiry_date": subscription.end_date or subscription.trial_end_date,
+        "admin_override": subscription.allowed_by_admin,
+        "features": subscription.get_features(),
     })
-
 
 # ---------- Forgot Password ----------
 from rest_framework.views import APIView

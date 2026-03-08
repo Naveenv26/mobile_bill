@@ -3,7 +3,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.hashers import make_password
 
-from .models import Shop, SubscriptionPlan, TaxProfile
+from .models import Shop, TaxProfile
+from api.models import SubscriptionPlan
 from .serializers import (
     ShopSerializer, AdminShopSerializer,
     SubscriptionPlanSerializer, TaxProfileSerializer,

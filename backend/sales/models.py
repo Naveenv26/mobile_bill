@@ -24,7 +24,7 @@ class Invoice(models.Model):
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     discount_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
     
     payment_mode = models.CharField(max_length=20, default="cash")
     created_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True)
