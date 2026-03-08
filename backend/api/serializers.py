@@ -118,7 +118,6 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
 class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True)
-    # Allow frontend to send these, but we process them manually
     customer_name = serializers.CharField(allow_blank=True, required=False, write_only=True)
     customer_mobile = serializers.CharField(allow_blank=True, required=False, write_only=True)
     customer_detail = CustomerSerializer(source="customer", read_only=True)
@@ -127,12 +126,11 @@ class InvoiceSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = (
             "id", "shop", "customer", "customer_detail", "customer_name", "customer_mobile",
-            "created_at", "total_amount", "subtotal", "tax_total", "grand_total", "status", "items",
+            "created_at", "subtotal", "tax_total", "grand_total", "status", "items",
             "invoice_date", "number", "payment_mode"
         )
-        # IMPORTANT: Totals are read_only so backend calculates them
         read_only_fields = (
-            "id", "shop", "customer", "created_at", "total_amount", "subtotal",
+            "id", "shop", "customer", "created_at", "subtotal",
             "tax_total", "grand_total", "customer_detail", "invoice_date", "number"
         )
 
