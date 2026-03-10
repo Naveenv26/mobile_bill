@@ -6,6 +6,12 @@ class Customer(models.Model):
     mobile = models.CharField(max_length=20, db_index=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
+    class Meta:
+        indexes = [
+            models.Index(fields=['shop', 'mobile']),
+            models.Index(fields=['shop', 'name']),
+        ]
+
     def __str__(self):
         return f"{self.name} ({self.mobile})"
 

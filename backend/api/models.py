@@ -1,5 +1,5 @@
 # backend/api/models.py
-
+from django.core.cache import cache
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -117,6 +117,7 @@ class UserSubscription(models.Model):
         self.trial_end_date = None
 
         self.save()
+        cache.delete(f"sub_valid_{self.user.id}")
 
     # Keep old name as alias so existing calls don't break
     def activate_plan(self, plan):
@@ -133,6 +134,7 @@ class UserSubscription(models.Model):
         self.grace_period_end = timezone.now() + timedelta(days=3)
         self.active = False
         self.save()
+        cache.delete(f"sub_valid_{self.user.id}")
 
     # --------------------------------------------------
     # STATUS CHECKS

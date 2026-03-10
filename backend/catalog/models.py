@@ -13,7 +13,12 @@ class Product(models.Model):
     quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    class Meta:
+        indexes = [
+            models.Index(fields=['shop', 'is_active']),
+            models.Index(fields=['shop', 'name']),
+        ]
+        
     def __str__(self):
         return self.name
 

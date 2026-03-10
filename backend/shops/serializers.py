@@ -20,6 +20,30 @@ class ShopSerializer(serializers.ModelSerializer):
         required=False,
     )
 
+    # ✅ Add this method
+    def validate_config(self, value):
+        ALLOWED_KEYS = {
+            'invoice',
+            'tax',
+            'inventory',
+            'notifications',
+            'customer',
+            # flat keys (keep for backwards compat)
+            'show_tax',
+            'show_discount',
+            'invoice_prefix',
+            'low_stock_alert',
+            'default_payment_mode',
+        }
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Config must be a JSON object.")
+        invalid_keys = set(value.keys()) - ALLOWED_KEYS
+        if invalid_keys:
+            raise serializers.ValidationError(
+                f"Invalid config keys: {invalid_keys}"
+            )
+        return value
+
     class Meta:
         model = Shop
         fields = "__all__"

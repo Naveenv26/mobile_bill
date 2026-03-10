@@ -10,6 +10,7 @@ from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.throttling import AnonRateThrottle
+from api.throttles import LoginThrottle
 
 User = get_user_model()
 
@@ -19,6 +20,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
     Returns `access` in json body and sets `refresh` token as httpOnly cookie.
     """
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = [LoginThrottle]
     
     # --- FIX: Removed the custom throttle ---
     # throttle_classes = [LoginThrottle]

@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import timedelta
 import dj_database_url
 import environ
+import sys
 
 # =======================================
 # Environment Setup
@@ -16,9 +17,9 @@ environ.Env.read_env(BASE_DIR / '.env')
 # =======================================
 # Security & Debug
 # =======================================
-SECRET_KEY = env('SECRET_KEY', default='dev-secret-key-change-me')
-DEBUG = env.bool('DEBUG', default=True)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+SECRET_KEY = env('SECRET_KEY')
+DEBUG = env.bool('DEBUG', default=False)
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # =======================================
 # Applications
@@ -32,6 +33,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_filters',
+    'background_task',
 
     # Third Party
     'rest_framework',
@@ -99,7 +101,9 @@ DATABASES = {
         conn_max_age=600
     )
 }
-
+if not DEBUG and 'sqlite' in DATABASES['default']['ENGINE']:
+    print("❌ ERROR: SQLite cannot be used in production. Set DATABASE_URL in .env")
+    sys.exit(1)
 # =======================================
 # Authentication
 # =======================================
@@ -124,17 +128,19 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "user": "1000/day",
+        "user": "5000/day",
         "anon": "100/day",
+        "forgot_password": "5/hour",
+        "login": "10/hour",
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
-    
     "DEFAULT_FILTER_BACKENDS": [
-    "django_filters.rest_framework.DjangoFilterBackend",
-    "rest_framework.filters.SearchFilter",
-    "rest_framework.filters.OrderingFilter",
-],
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "EXCEPTION_HANDLER": "api.exceptions.custom_exception_handler",
 }
 
 # --- 💡 MODIFIED THIS SECTION ---
@@ -151,7 +157,7 @@ SIMPLE_JWT = {
 # =======================================
 STATIC_URL = '/static/'
 # 🚨 ADD THESE TWO LINES FOR PRODUCTION:
-STATIC_ROOT = BASE_DIR / 'staticfiles' 
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
@@ -162,20 +168,17 @@ MEDIA_ROOT = BASE_DIR / 'media' # Optional: Good to define this too
 # =======================================
 RAZORPAY_KEY_ID = env('RAZORPAY_KEY_ID', default='')
 RAZORPAY_KEY_SECRET = env('RAZORPAY_KEY_SECRET', default='')
-
+RAZORPAY_WEBHOOK_SECRET = env('RAZORPAY_WEBHOOK_SECRET', default='')
 # =======================================
 # CORS & CSRF
 # =======================================
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
-CORS_ALLOWED_ORIGINS = [
-    env('FRONTEND_URL', default='http://localhost:5173'),
-]
+CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
 CSRF_TRUSTED_ORIGINS = [
-    env('FRONTEND_URL', default='http://localhost:5173'),
+    FRONTEND_URL,
     'http://127.0.0.1:5173',
 ]
-
 # =======================================
 # Security Headers
 # =======================================
@@ -185,7 +188,19 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
-
+# ===========================
+# Cache
+# ===========================
+# Production only — switch to this when deploying
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/0"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
 
 # =======================================
 # Localization

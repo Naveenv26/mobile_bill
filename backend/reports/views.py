@@ -32,7 +32,6 @@ def sales_summary(request):
         "all_time": get_summary({}),
     })
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def top_products(request):
@@ -42,6 +41,8 @@ def top_products(request):
 
     top = InvoiceItem.objects.filter(
         invoice__shop=shop
+    ).select_related(          # ✅ add this
+        'product', 'invoice'
     ).values(
         'product__id', 'product__name'
     ).annotate(
@@ -50,7 +51,6 @@ def top_products(request):
     ).order_by('-total_revenue')[:10]
 
     return Response(list(top))
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

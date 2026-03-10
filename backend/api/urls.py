@@ -1,8 +1,10 @@
 # backend/api/urls.py
 
+from django.http import JsonResponse
+from django.db import connection
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from sales.views import invoice_pdf , invoice_whatsapp
+from sales.views import invoice_pdf, invoice_whatsapp
 from .views import (
     ResetPasswordView,
     check_subscription,
@@ -16,14 +18,15 @@ from .views import (
     MeViewSet,
     ReportsViewSet,
     ForgotPasswordView,
-    StaffViewSet,   # <-- ADDED
+    StaffViewSet,
+    FeedbackViewSet,
 )
-from .views import FeedbackViewSet
+
 # Auth
 from .auth_views import CookieTokenObtainPairView, CookieTokenRefreshView, logout_view
 
-# Shop Registration
-from shops.views import register_shop , TaxProfileViewSet
+# Shop
+from shops.views import register_shop, TaxProfileViewSet, AdminShopViewSet
 
 # Razorpay
 from .razorpay_webhook import razorpay_webhook
@@ -34,6 +37,21 @@ from .payment_views import (
     payment_history,
 )
 
+def health_check(request):
+    # Check DB connection
+    try:
+        connection.ensure_connection()
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+
+    return JsonResponse({
+        "status": "ok",
+        "db": db_status,
+        "version": "1.0.0"
+    })
+
+
 # --------------------------------------------------------------------
 
 router = DefaultRouter()
@@ -43,10 +61,12 @@ router.register(r'customers', CustomerViewSet, basename='customer')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'taxprofiles', TaxProfileViewSet, basename='taxprofile')
 router.register(r'shops', ShopViewSet, basename='shop')
+router.register(r'admin/shops', AdminShopViewSet, basename='admin-shops')  # ✅ added
 router.register(r'me', MeViewSet, basename='me')
 router.register(r'reports', ReportsViewSet, basename='reports')
-router.register(r'staff', StaffViewSet, basename='staff')   # <-- ADDED
+router.register(r'staff', StaffViewSet, basename='staff')
 router.register(r'feedback', FeedbackViewSet, basename='feedback')
+
 # --------------------------------------------------------------------
 
 urlpatterns = [
@@ -70,7 +90,15 @@ urlpatterns = [
     path("payments/start-trial/", start_trial, name="start-trial"),
     path("payments/history/", payment_history, name="payment-history"),
     path("payments/webhook/", razorpay_webhook, name="razorpay-webhook"),
-    path('invoices/<int:invoice_id>/pdf/', invoice_pdf, name='invoice-pdf'),
-    # API (router)
+
+    # Invoice actions
+    path("invoices/<int:invoice_id>/pdf/", invoice_pdf, name="invoice-pdf"),
+    path("invoices/<int:invoice_id>/whatsapp/", invoice_whatsapp, name="invoice-whatsapp"),  # ✅ added
+
+    # Subscription check
+    path("subscription/check/", check_subscription, name="check-subscription"),
+
+    # Router URLs
     path("", include(router.urls)),
+    path('health/', health_check, name='health-check'),
 ]

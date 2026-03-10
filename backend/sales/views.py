@@ -63,7 +63,7 @@ def invoice_whatsapp(request, invoice_id):
         return Response({"error": "Invoice not found"}, status=404)
 
     shop = invoice.shop
-    currency = getattr(shop, 'currency_symbol', '₹')
+    currency = shop.config.get('tax', {}).get('currency', '₹')
     mobile = invoice.customer_mobile or ''
 
     message = (

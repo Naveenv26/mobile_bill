@@ -28,7 +28,7 @@ def generate_invoice_pdf(invoice):
     elements.append(Spacer(1, 12))
 
     # Items Table
-    currency = getattr(shop, 'currency_symbol', '₹')
+    currency = shop.config.get('tax', {}).get('currency', '₹')
     table_data = [['#', 'Product', 'Qty', 'Unit Price', 'Tax %', 'Total']]
     for i, item in enumerate(invoice.items.select_related('product'), 1):
         table_data.append([

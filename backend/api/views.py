@@ -1,5 +1,6 @@
 # backend/api/views.py
-
+from django.db import transaction
+from django.db.models import F
 # --- Django Imports ---
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -18,6 +19,8 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from .pagination import SmallPagination, StandardPagination, LargePagination
+from .throttles import ForgotPasswordThrottle
+from rest_framework.exceptions import PermissionDenied
 
 # --- Local App Imports ---
 # Serializers (from .serializers)
@@ -138,9 +141,43 @@ class InvoiceViewSet(ShopFilteredViewSet):
     serializer_class = InvoiceSerializer
     pagination_class = StandardPagination
 
+    def get_queryset(self):              # ✅ fix indent — should be 4 spaces
+        return Invoice.objects.filter(   # ✅ not 8 spaces
+            shop=self.request.user.shop
+        ).select_related(
+            'customer', 'created_by', 'shop'
+        ).prefetch_related(
+            'items__product'
+        ).order_by('-invoice_date')
 
+    @transaction.atomic                          # ✅ entire invoice creation is atomic
+    def perform_create(self, serializer):
+        user = self.request.user
+        shop = user.shop
 
+        # Save invoice first
+        invoice = serializer.save(
+            shop=shop,
+            created_by=user
+        )
 
+        # ✅ Deduct stock atomically for each item
+        for item in invoice.items.select_related('product').all():
+            updated = Product.objects.filter(
+                id=item.product_id,
+                shop=shop,
+                quantity__gte=item.qty       # only update if enough stock
+            ).update(
+                quantity=F('quantity') - item.qty
+            )
+
+            if updated == 0:
+                # Check if it's an oversell or race condition
+                product = Product.objects.get(id=item.product_id)
+                if product.quantity < item.qty:
+                    item.oversold = True      # ✅ mark as oversold
+                    item.save()
+                # Don't block the sale — just flag it
 class ShopViewSet(viewsets.ModelViewSet):
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
@@ -164,9 +201,24 @@ class StaffViewSet(viewsets.ModelViewSet):
         return User.objects.none()
 
     def perform_create(self, serializer):
-        if not hasattr(self.request.user, 'shop') or not self.request.user.shop:
-            raise permissions.ValidationError("You are not associated with a shop and cannot create staff.")
-        serializer.save(shop=self.request.user.shop)
+        user = self.request.user
+
+        if user.role not in ['SHOP_OWNER', 'SITE_ADMIN']:
+            raise PermissionDenied("Only shop owners can create staff.")
+
+        if not user.shop:
+            raise PermissionDenied("You are not associated with a shop.")
+
+        role = serializer.validated_data.get('role', 'SHOPKEEPER')
+        if role == 'SITE_ADMIN':
+            raise PermissionDenied("Cannot create Site Admin via this endpoint.")
+
+        serializer.save(shop=user.shop)
+
+    def perform_destroy(self, instance):
+        if instance.shop != self.request.user.shop:
+            raise PermissionDenied("Cannot delete staff from another shop.")
+        instance.delete()
 
 
 # ---------- Current User (FIXED) ----------
@@ -251,6 +303,7 @@ from rest_framework.views import APIView
 
 class ForgotPasswordView(APIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = [ForgotPasswordThrottle]
 
     def post(self, request):
         email = request.data.get("email")

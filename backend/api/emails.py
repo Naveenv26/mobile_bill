@@ -1,21 +1,21 @@
-# backend/api/emails.py
 from django.core.mail import send_mail
 from django.conf import settings
+from background_task import background
 
-def send_password_reset_email(email, reset_url):
-    subject = "Password Reset Request"
+@background(schedule=0)
+def send_password_reset_email_async(email, reset_url):
+    subject = "Password Reset - SparkBill"
     message = f"""
 Hi,
 
-We received a request to reset your password.
-Please click the link below to reset your password:
+Click the link below to reset your password:
 
 {reset_url}
 
-If you didn't request this, you can ignore this email.
+This link expires in 24 hours.
 
 Thanks,
-Your Billing App Team
+SparkBill Team
 """
     send_mail(
         subject,
@@ -24,3 +24,7 @@ Your Billing App Team
         [email],
         fail_silently=False,
     )
+
+# Keep sync version as fallback
+def send_password_reset_email(email, reset_url):
+    send_password_reset_email_async(email, reset_url)
