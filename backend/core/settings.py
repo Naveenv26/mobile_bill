@@ -19,7 +19,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 # =======================================
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '.onrender.com', '.vercel.app'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # =======================================
 # Applications
@@ -175,16 +175,13 @@ RAZORPAY_WEBHOOK_SECRET = env('RAZORPAY_WEBHOOK_SECRET', default='')
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
 CORS_ALLOWED_ORIGINS = [FRONTEND_URL, 'http://localhost:5173']
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.vercel\.app$",
-]
-CSRF_TRUSTED_ORIGINS = [
-    FRONTEND_URL,
-    'http://127.0.0.1:5173',
-    'http://localhost:5173',
-    'https://*.vercel.app',
-    'https://*.onrender.com',
-]
+
+# Parse additional comma-separated origins if provided (for safety scaling)
+for origin in env.list('ADDITIONAL_CORS_ORIGINS', default=[]):
+    CORS_ALLOWED_ORIGINS.append(origin)
+
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
+# Note: CSRF_TRUSTED_ORIGINS requires the scheme (http/https). FRONTEND_URL has it.
 # =======================================
 # Security Headers
 # =======================================
