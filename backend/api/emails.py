@@ -1,9 +1,8 @@
 from django.core.mail import send_mail
 from django.conf import settings
-from background_task import background
+import threading
 
-@background(schedule=0)
-def send_password_reset_email_async(email, reset_url):
+def _send_password_reset_email_task(email, reset_url):
     subject = "Password Reset - SparkBill"
     message = f"""
 Hi,
@@ -25,6 +24,8 @@ SparkBill Team
         fail_silently=False,
     )
 
-# Keep sync version as fallback
 def send_password_reset_email(email, reset_url):
-    send_password_reset_email_async(email, reset_url)
+    # Launch email task in a separate thread so it doesn't block the request
+    thread = threading.Thread(target=_send_password_reset_email_task, args=(email, reset_url))
+    thread.daemon = True
+    thread.start()
