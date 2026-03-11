@@ -82,6 +82,7 @@ export default function Stock() {
     const shop = JSON.parse(localStorage.getItem("shop")) || {};
     const config = shop.config || {};
     const lowStockThreshold = Number(config.inventory?.lowStockLimit ?? 5);
+    const customUnits = config.inventory?.units || ["pcs", "kg", "ltr", "box"];
     // ---------------------------------
 
     useEffect(() => { load() }, []);
@@ -460,10 +461,9 @@ export default function Stock() {
                                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Unit</label>
                                     <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} onKeyDown={handleEnter} 
                                         className="w-full border-white/50 bg-white/60 rounded-xl focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-400/20 transition-all p-3 text-sm font-medium shadow-sm text-slate-900">
-                                        <option value="pcs">pcs</option>
-                                        <option value="kg">kg</option>
-                                        <option value="ltr">ltr</option>
-                                        <option value="box">box</option>
+                                        {customUnits.map(u => (
+                                            <option key={u} value={u.toLowerCase()}>{u}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>

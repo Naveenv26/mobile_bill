@@ -46,15 +46,31 @@ export default function Settings() {
     setLoading(true);
     try {
       const res = await axios.get("/me/");
-      setShopData(res.data.shop);
-      localStorage.setItem("shop", JSON.stringify(res.data.shop));
+      // ✅ Get latest shop data from backend (not localStorage)
+      const shopFromServer = res.data.shop;
+      setShopData(shopFromServer);
+      localStorage.setItem("shop", JSON.stringify(shopFromServer));
+
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to load settings");
+      console.error("Failed to fetch shop data:", err);
+
+      // ✅ Fallback to localStorage if network fails
+      const cached = localStorage.getItem("shop");
+      if (cached) {
+        try {
+          setShopData(JSON.parse(cached));
+          toast("Loaded from cache — changes may not be saved", { icon: "⚠️" });
+        } catch {
+          toast.error("Failed to load settings");
+        }
+      } else {
+        toast.error("Failed to load settings. Please refresh.");
+      }
+
     } finally {
       setLoading(false);
     }
-  };
+};
 
   useEffect(() => {
     fetchShopData();
@@ -73,26 +89,41 @@ export default function Settings() {
   }, [activeTab]);
 
   // --- UPDATE FUNCTION ---
-  const updateSettings = async (category, newData) => {
+ const updateSettings = async (category, newData) => {
     if (!shopData) return;
 
     const currentConfig = shopData.config || {};
-    const updatedConfig = { 
-        ...currentConfig, 
-        [category]: { ...(currentConfig[category] || {}), ...newData } 
+    const updatedConfig = {
+        ...currentConfig,
+        [category]: { ...(currentConfig[category] || {}), ...newData }
     };
 
     try {
-      await axios.patch(`/shops/${shopData.id}/`, { config: updatedConfig });
-      const newShopData = { ...shopData, config: updatedConfig };
-      setShopData(newShopData);
-      localStorage.setItem("shop", JSON.stringify(newShopData));
+      // ✅ PATCH to correct endpoint
+      const res = await axios.patch(`/shops/${shopData.id}/`, { 
+        config: updatedConfig 
+      });
+
+      // ✅ Use server response to update state (not local guess)
+      const updatedShop = res.data;
+      setShopData(updatedShop);
+      localStorage.setItem("shop", JSON.stringify(updatedShop));
       toast.success("Settings saved!");
+
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to save settings.");
+      console.error("Failed to save settings:", err);
+      
+      if (err.response?.status === 400) {
+        toast.error("Invalid settings data.");
+      } else if (err.response?.status === 403) {
+        toast.error("You don't have permission to update settings.");
+      } else if (err.response?.status === 404) {
+        toast.error("Shop not found. Please refresh.");
+      } else {
+        toast.error("Failed to save settings. Please try again.");
+      }
     }
-  };
+};
 
   const renderContent = () => {
     if (loading && !shopData) return <div className="p-10 text-center">Loading settings...</div>;

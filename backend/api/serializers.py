@@ -190,10 +190,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 invoice=invoice, product=prod, qty=qty, unit_price=price,
                 tax_rate=tax, line_total=line_total + line_tax
             )
-            
-            # Reduce Stock
-            prod.quantity = F('quantity') - qty
-            prod.save()
 
         # 5. Save Final Totals
         invoice.subtotal = total_calc

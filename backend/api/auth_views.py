@@ -10,6 +10,7 @@ from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.throttling import AnonRateThrottle
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from api.throttles import LoginThrottle
 
 User = get_user_model()
@@ -30,11 +31,36 @@ class CookieTokenObtainPairView(TokenObtainPairView):
         return super().finalize_response(request, response, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
+        # 1. Standard login logic
         resp = super().post(request, *args, **kwargs)
-        # resp.data contains 'access' and 'refresh'
+        
+        # 2. Extract tokens
         refresh = resp.data.get("refresh")
         access = resp.data.get("access")
+        
         if refresh:
+            user = self.user  # available via the serializer in TokenObtainPairView
+            
+            # --- Enforce 3 Device Limit (Active Refresh Tokens) ---
+            # Get all tokens for this user that are NOT blacklisted
+            active_tokens = OutstandingToken.objects.filter(
+                user=user
+            ).exclude(
+                id__in=BlacklistedToken.objects.values_list('token_id', flat=True)
+            ).order_by('created_at')
+            
+            # If they have more than 3, blacklist the oldest ones
+            # (We check > 2 because 'refresh' hasn't been added to OutstandingToken yet usually, 
+            # or it might have just been added. Standard practice is to limit to 3 total.)
+            # Just to be safe and accurate, let's keep it to 3 tokens max.
+            token_count = active_tokens.count()
+            if token_count > 3:
+                # Blacklist the oldest tokens to bring count down to 3
+                tokens_to_kill = active_tokens[:(token_count - 3)]
+                for tk in tokens_to_kill:
+                    BlacklistedToken.objects.get_or_create(token=tk)
+            # --------------------------------------------------------
+
             response = Response({"access": access}, status=status.HTTP_200_OK)
             max_age = int(settings.SIMPLE_JWT.get("REFRESH_TOKEN_LIFETIME", timedelta(days=7)).total_seconds())
             response.set_cookie(

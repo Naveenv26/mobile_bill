@@ -4,8 +4,7 @@ import { getProducts } from "../api/products.js";
 import { createInvoice } from "../api/invoices.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
 import toast from "react-hot-toast";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generateThermalPDF } from "../utils/pdfGenerator.js";
 
 // --- Icons ---
 const SearchIcon = () => <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
@@ -23,6 +22,10 @@ export default function Billing() {
   const [customerMobile, setCustomerMobile] = useState("");
   const [search, setSearch] = useState("");
   
+  const [applyTax, setApplyTax] = useState(true);
+  const [applyDiscount, setApplyDiscount] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState(0);
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [invoiceData, setInvoiceData] = useState(null);
@@ -75,7 +78,7 @@ export default function Billing() {
       return [...prev, { ...p, qty: 1 }];
     });
     toast.custom((t) => (
-      <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-slate-800 text-white shadow-lg rounded-full pointer-events-auto flex ring-1 ring-black ring-opacity-5 px-4 py-2 items-center justify-center mb-24`}>
+      <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-slate-800 text-white shadow-lg rounded-full pointer-events-auto flex ring-1 ring-black ring-opacity-5 px-4 py-2 items-center justify-center mb-4`}>
         <div className="flex items-center">
              <div className="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
              <p className="text-sm font-medium">Added <span className="font-bold">{p.name}</span></p>
@@ -95,8 +98,10 @@ export default function Billing() {
   };
 
   const subtotal = cart.reduce((sum, c) => sum + c.qty * c.price, 0);
-  const tax = cart.reduce((sum, c) => sum + (c.qty * c.price * (c.tax_rate || 0)) / 100, 0);
-  const total = subtotal + tax;
+  const tax = applyTax ? cart.reduce((sum, c) => sum + (c.qty * c.price * (c.tax_rate || 0)) / 100, 0) : 0;
+  const rawDiscount = applyDiscount && discountPercent > 0 ? (subtotal * discountPercent) / 100 : 0;
+  const discountAmount = Math.min(Math.max(0, rawDiscount), subtotal);
+  const total = subtotal + tax - discountAmount;
   const totalItems = cart.reduce((sum, c) => sum + c.qty, 0);
 
   const finalizeInvoice = async () => {
@@ -112,9 +117,12 @@ export default function Billing() {
           product: c.id,
           qty: c.qty,
           unit_price: c.price,
-          tax_rate: c.tax_rate || 0,
+          tax_rate: applyTax ? (c.tax_rate || 0) : 0,
         })),
-        total_amount: total,
+        subtotal: subtotal,
+        tax_total: tax,
+        discount_total: discountAmount,
+        total_amount: subtotal + tax,
         grand_total: total,
       };
 
@@ -139,79 +147,6 @@ export default function Billing() {
 
   // --- PDF LOGIC STARTS HERE ---
 
-  // Helper: Generate 80mm Thermal Receipt
-  const generateThermalPDF = (doc, printData) => {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(currentShop.name || "Shop Name", 40, 8, { align: "center" });
-    
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(currentShop.address || "", 40, 12, { align: "center" });
-    doc.text(`Ph: ${currentShop.contact_phone || ""}`, 40, 16, { align: "center" });
-
-    doc.line(4, 18, 76, 18); 
-
-    let y = 23;
-    const leftX = 4;  
-    const rightX = 76; 
-    
-    doc.setFontSize(8);
-    doc.text(`Name: ${printData.customer_name || "Walk-in"}`, leftX, y, { align: "left" });
-    doc.text(`${new Date().toLocaleDateString()}`, rightX, y, { align: "right" });
-    y += 5;
-
-    if (printData.customer_mobile) {
-        doc.text(`Mob: ${printData.customer_mobile}`, leftX, y, { align: "left" });
-    }
-    doc.text(`Bill No: #${printData.number || printData.id}`, rightX, y, { align: "right" });
-
-    const tableColumn = ["Item", "Qty", "Price", "Tot"];
-    const tableRows = [];
-
-    (printData.items || []).forEach(item => {
-      const name = item.product_name || item.name || "Item";
-      const displayName = name.length > 12 ? name.substring(0, 12) + ".." : name;
-      tableRows.push([displayName, item.qty, Math.round(item.unit_price), Math.round(item.qty * item.unit_price)]);
-    });
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: y + 4,
-      theme: 'plain',
-      styles: { fontSize: 8, cellPadding: 1 },
-      headStyles: { fillColor: [220, 220, 220], textColor: 20, fontStyle: 'bold' },
-      columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 10, halign: 'center' },
-          2: { cellWidth: 15, halign: 'right' },
-          3: { cellWidth: 15, halign: 'right' },
-      },
-      margin: { left: 3, right: 3 }
-    });
-
-    let finalY = doc.lastAutoTable.finalY + 5;
-    doc.setFontSize(8);
-    const subTotalAmt = Number(printData.subtotal || printData.total_amount || 0); 
-    const taxAmt = Number(printData.tax_total || 0);
-    const grandTotal = Number(printData.grand_total || 0);
-
-    doc.text(`Subtotal: ${subTotalAmt.toFixed(2)}`, 76, finalY, { align: "right" });
-    finalY += 4;
-    doc.text(`Tax: ${taxAmt.toFixed(2)}`, 76, finalY, { align: "right" });
-    finalY += 5;
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text(`TOTAL: Rs. ${grandTotal.toFixed(2)}`, 76, finalY, { align: "right" });
-
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "italic");
-    doc.text("*** Thank You Visit Again ***", 40, finalY + 8, { align: "center" });
-  };
-
-  // Helper: Generate A4 Standard Invoice
   const generateA4PDF = (doc, printData) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
@@ -275,19 +210,38 @@ export default function Billing() {
     });
 
     // Totals
-    const finalY = doc.lastAutoTable.finalY + 10;
+    let finalY = doc.lastAutoTable.finalY + 10;
     const rightAlign = pageWidth - margin;
+    
+    const subtotal = Number(printData.subtotal || printData.total_amount || 0);
+    const tax = Number(printData.tax_total || 0);
+    const discount = Number(printData.discount_total || 0);
 
     doc.text(`Subtotal:`, rightAlign - 40, finalY, { align: "right" });
-    doc.text(`${Number(printData.subtotal || printData.total_amount).toFixed(2)}`, rightAlign, finalY, { align: "right" });
+    doc.text(`${subtotal.toFixed(2)}`, rightAlign, finalY, { align: "right" });
     
-    doc.text(`Tax:`, rightAlign - 40, finalY + 6, { align: "right" });
-    doc.text(`${Number(printData.tax_total || 0).toFixed(2)}`, rightAlign, finalY + 6, { align: "right" });
+    if (discount > 0) {
+        finalY += 6;
+        doc.setTextColor(0, 100, 0);
+        doc.text(`Discount:`, rightAlign - 40, finalY, { align: "right" });
+        doc.text(`-${discount.toFixed(2)}`, rightAlign, finalY, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+    }
+    
+    if (tax > 0) {
+        finalY += 6;
+        doc.text(`CGST:`, rightAlign - 40, finalY, { align: "right" });
+        doc.text(`${(tax / 2).toFixed(2)}`, rightAlign, finalY, { align: "right" });
+        finalY += 6;
+        doc.text(`SGST:`, rightAlign - 40, finalY, { align: "right" });
+        doc.text(`${(tax / 2).toFixed(2)}`, rightAlign, finalY, { align: "right" });
+    }
 
+    finalY += 10;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(`Grand Total:`, rightAlign - 40, finalY + 14, { align: "right" });
-    doc.text(`Rs. ${Number(printData.grand_total).toFixed(2)}`, rightAlign, finalY + 14, { align: "right" });
+    doc.text(`Grand Total:`, rightAlign - 40, finalY, { align: "right" });
+    doc.text(`Rs. ${Number(printData.grand_total).toFixed(2)}`, rightAlign, finalY, { align: "right" });
 
     // Footer
     doc.setFontSize(9);
@@ -296,8 +250,35 @@ export default function Billing() {
     doc.text("Thank you for your business!", pageWidth / 2, 280, { align: "center" });
   };
 
-  const generatePDFFile = (dataToPrint) => {
-    const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
+  const handleDownloadAndReset = () => {
+    setIsGeneratingPDF(true);
+    try {
+      const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
+      const isA4 = paperSize === "A4";
+
+      const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: isA4 ? 'a4' : [80, 200]
+      });
+
+      if (isA4) {
+          generateA4PDF(doc, invoiceData);
+      } else {
+          generateThermalPDF(doc, invoiceData); // Assuming handleGeneratePDF was a typo for generateThermalPDF
+      }
+      doc.save(`Invoice_${invoiceData?.number || 'Bill'}.pdf`);
+    } catch (err) {
+      console.error("PDF Gen Error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+      resetBilling();
+    }
+  };
+
+  const generatePDFFile = (dataToPrint, forceA4 = false) => {
+    const paperSize = forceA4 ? "A4" : (currentShop?.config?.invoice?.paper_size || "80mm");
     const isA4 = paperSize === "A4";
 
     const doc = new jsPDF({
@@ -318,7 +299,7 @@ export default function Billing() {
   const handleShare = async () => {
     setIsGeneratingPDF(true);
     try {
-        const pdfBlob = generatePDFFile(invoiceData); 
+        const pdfBlob = generatePDFFile(invoiceData, true); 
         const file = new File([pdfBlob], `Invoice_${invoiceData?.number || 'Bill'}.pdf`, { type: "application/pdf" });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -401,17 +382,27 @@ export default function Billing() {
 
       <div className="p-4 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(products || [])
-                .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-                .map((p) => {
+            {(() => {
+                const filteredProducts = (products || [])
+                    .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+
+                if (filteredProducts.length === 0) {
+                    return (
+                        <div className="col-span-full py-20 flex flex-col items-center justify-center text-slate-400">
+                            <p>No products found</p>
+                        </div>
+                    );
+                }
+                
+                return filteredProducts.map((p) => {
                     const inCart = cart.find(c => c.id === p.id);
                     return (
                         <div 
                             key={p.id} 
-                            onClick={() => addToCart(p)} 
+                            onClick={() => p.stock > 0 && addToCart(p)} 
                             className={`
-                                group relative overflow-hidden cursor-pointer
-                                bg-white rounded-2xl p-5 
+                                group relative overflow-hidden cursor-pointer flex flex-col justify-between
+                                bg-white rounded-2xl p-5 min-h-[140px]
                                 border border-transparent hover:border-indigo-100
                                 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)]
                                 transition-all duration-300 transform hover:-translate-y-1
@@ -432,21 +423,37 @@ export default function Billing() {
                                 </div>
                             </div>
                             
-                            {inCart && (
-                                <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 pl-2 pr-3 py-1 rounded-full animate-fade-in-up">
-                                    <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></div>
-                                    {inCart.qty} added
-                                </div>
-                            )}
+                            <div className="mt-4 flex items-center justify-between relative z-10 h-10">
+                                <span className="font-extrabold text-lg text-slate-900 tracking-tight"></span> {/* Empty span to push controls right */}
+                                
+                                {inCart ? (
+                                    <div className="flex items-center bg-indigo-50 rounded-xl border border-indigo-100" onClick={e => e.stopPropagation()}>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); updateQty(inCart.id, inCart.qty - 1); }} 
+                                            className="w-10 h-10 flex items-center justify-center text-indigo-600 hover:bg-indigo-100 rounded-l-xl transition-colors"
+                                        >
+                                            <MinusIcon />
+                                        </button>
+                                        <span className="w-8 text-center font-extrabold text-indigo-900 text-sm">
+                                            {inCart.qty}
+                                        </span>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); updateQty(inCart.id, inCart.qty + 1); }} 
+                                            className="w-10 h-10 flex items-center justify-center text-indigo-600 hover:bg-indigo-100 rounded-r-xl transition-colors"
+                                        >
+                                            <PlusIcon />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${p.stock === 0 ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white group-hover:bg-indigo-600'}`}>
+                                        <PlusIcon />
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    )
-                })
-            }
-            {products.length === 0 && (
-                <div className="col-span-full py-20 flex flex-col items-center justify-center text-slate-400">
-                    <p>No products found</p>
-                </div>
-            )}
+                    );
+                });
+            })()}
         </div>
       </div>
 
@@ -516,16 +523,80 @@ export default function Billing() {
                     ))}
                 </div>
 
+                {/* NEW TOGGLES SECTION */}
+                <div className="px-6 py-2 border-t border-slate-100 bg-white">
+                    <div className="flex items-center justify-between mb-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={applyTax} 
+                                onChange={(e) => setApplyTax(e.target.checked)}
+                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300" 
+                            />
+                            <span className="text-sm font-bold text-slate-700">Apply GST/Tax</span>
+                        </label>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={applyDiscount} 
+                                onChange={(e) => setApplyDiscount(e.target.checked)}
+                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300" 
+                            />
+                            <span className="text-sm font-bold text-slate-700">Apply Discount</span>
+                        </label>
+                        {applyDiscount && (
+                            <div className="flex items-center justify-end w-24">
+                                <input 
+                                    type="number" 
+                                    min="0"
+                                    max="100"
+                                    value={discountPercent} 
+                                    onChange={(e) => {
+                                        let val = parseInt(e.target.value) || 0;
+                                        setDiscountPercent(Math.min(100, Math.max(0, val)));
+                                    }}
+                                    className="w-14 items-center justify-center text-center px-2 py-1 text-sm border border-slate-200 rounded-l-lg focus:ring-2 focus:ring-indigo-500 bg-slate-50"
+                                />
+                                <span className="bg-slate-100 border border-l-0 border-slate-200 text-slate-500 text-sm font-bold px-2 py-1 rounded-r-lg">%</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 <div className="p-6 bg-slate-50 border-t border-slate-100 sm:rounded-b-2xl">
                     <div className="space-y-2 mb-6">
                         <div className="flex justify-between text-sm text-slate-500">
                             <span>Subtotal</span>
                             <span>₹{subtotal.toFixed(2)}</span>
                         </div>
+                        
+                        {applyTax && tax > 0 && (
+                            <>
+                                <div className="flex justify-between text-xs text-slate-400 pl-2">
+                                    <span>CGST</span>
+                                    <span>₹{(tax / 2).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-slate-400 pl-2">
+                                    <span>SGST</span>
+                                    <span>₹{(tax / 2).toFixed(2)}</span>
+                                </div>
+                            </>
+                        )}
                         <div className="flex justify-between text-sm text-slate-500">
-                            <span>Tax</span>
-                            <span>₹{tax.toFixed(2)}</span>
+                            <span>Total Tax</span>
+                            <span>+₹{tax.toFixed(2)}</span>
                         </div>
+                        
+                        {applyDiscount && discountAmount > 0 && (
+                            <div className="flex justify-between text-sm text-emerald-600 font-bold tracking-wide">
+                                <span>Discount (-{discountPercent}%)</span>
+                                <span>-₹{discountAmount.toFixed(2)}</span>
+                            </div>
+                        )}
+                        
                         <div className="flex justify-between text-xl font-extrabold text-slate-900 pt-3 border-t border-slate-200">
                             <span>Total Amount</span>
                             <span>₹{total.toFixed(2)}</span>

@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { getInvoices } from "../api/invoices";
 import { getProducts } from "../api/products";
 
+import { useSubscription } from "../context/SubscriptionContext.jsx";
+import { generateThermalPDF } from "../utils/pdfGenerator.js";
+
 // --- Elegant Thin Icons ---
 const IconWrapper = ({ children, className }) => (
   <div className={`${className} flex items-center justify-center rounded-full`}>
@@ -36,6 +39,7 @@ const TrendUpIcon = ({ className = "w-6 h-6" }) => (
 );
 
 export default function Dashboard() {
+  const { currentShop } = useSubscription();
   const [invoices, setInvoices] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +144,11 @@ export default function Dashboard() {
                 <div className="text-center py-10 text-slate-400 text-sm">No recent transactions</div>
             ) : (
                 invoices.slice(0, 8).map((inv, index) => (
-                    <div key={inv.id} className="group flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-95 transition-transform">
+                    <div 
+                        key={inv.id} 
+                        onClick={() => generateThermalPDF(inv, currentShop)}
+                        className="group flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-95 transition-transform cursor-pointer hover:border-blue-200"
+                    >
                         <div className="flex items-center gap-4">
                             {/* Minimalist Icon Box */}
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${index % 2 === 0 ? 'bg-blue-50 text-blue-600' : 'bg-indigo-50 text-indigo-600'}`}>

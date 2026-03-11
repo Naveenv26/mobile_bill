@@ -3,6 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getInvoices } from "../api/invoices.js";
 import { getProducts } from "../api/products.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
+import { utils, writeFileXLSX } from "xlsx";
+import { generateThermalPDF } from "../utils/pdfGenerator.js";
 
 // --- Charts ---
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -58,8 +60,44 @@ export default function Reports() {
     const [loading, setLoading] = useState(true);
 
     // 1. Get hasFeature
-    const { isSubscribed, hasFeature } = useSubscription();
+    const { isSubscribed, hasFeature, currentShop } = useSubscription();
     const exportMenuRef = useRef(null);
+
+    // --- Export Logic ---
+    const handleExport = () => {
+        if (!hasFeature('export')) return;
+        
+        let exportData = [];
+        if (tab === 'sales') {
+            exportData = filteredData.map(inv => ({
+                "Invoice No": inv.number || inv.id,
+                "Date": new Date(inv.invoice_date).toLocaleDateString(),
+                "Customer": inv.customer_detail?.name || inv.customer_name || "Walk-in",
+                "Subtotal": Number(inv.subtotal || 0),
+                "Tax": Number(inv.tax_total || 0),
+                "Total Amount": Number(inv.grand_total || 0)
+            }));
+        } else if (tab === 'stock') {
+            exportData = filteredData.map(p => ({
+                "Product Name": p.name,
+                "Current Stock": p.quantity,
+                "Unit Price": p.price,
+                "Total Value": p.quantity * p.price
+            }));
+        } else {
+            exportData = filteredData.map(p => ({
+                "Product Name": p.name,
+                "Units Sold": p.qty,
+                "Estimated Revenue": p.qty * p.price
+            }));
+        }
+
+        const ws = utils.json_to_sheet(exportData);
+        const wb = utils.book_new();
+        utils.book_append_sheet(wb, ws, `${tab}_report`);
+        writeFileXLSX(wb, `SparkBill_${tab}_Report.xlsx`);
+        setShowExportMenu(false);
+    };
 
     // --- THEME CONFIGURATION ---
     const themeColor = useMemo(() => {
@@ -163,7 +201,7 @@ export default function Reports() {
                         {/* 2. Gate the Export Button */}
                         {hasFeature('export') && (
                             <div className="relative" ref={exportMenuRef}>
-                                <button onClick={() => setShowExportMenu(!showExportMenu)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-200 active:scale-95 transition-all">
+                                <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-200 active:scale-95 transition-all">
                                     <DownloadIcon /> <span>EXPORT</span>
                                 </button>
                             </div>
@@ -348,7 +386,14 @@ export default function Reports() {
                     <div className="absolute inset-0" onClick={() => setSelectedInvoice(null)}></div>
                     <div className="bg-white w-full sm:w-[450px] rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 overflow-hidden max-h-[90vh] flex flex-col animate-slide-up">
                         <div className="bg-slate-900 text-white p-6 text-center relative">
-                             <button onClick={() => setSelectedInvoice(null)} className="absolute right-4 top-4 p-2 bg-white/10 rounded-full hover:bg-white/20"><CloseIcon /></button>
+                             <div className="absolute right-4 top-4 flex gap-2">
+                                 <button onClick={() => generateThermalPDF(selectedInvoice, currentShop)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors" title="Download PDF">
+                                     <DownloadIcon />
+                                 </button>
+                                 <button onClick={() => setSelectedInvoice(null)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+                                     <CloseIcon />
+                                 </button>
+                             </div>
                              <h2 className="text-2xl font-black">{formatCurrency(selectedInvoice.grand_total)}</h2>
                              <div className="mt-2 text-xs opacity-70">Paid via Cash</div>
                         </div>

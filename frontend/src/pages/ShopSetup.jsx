@@ -9,7 +9,6 @@ export default function ShopSetup() {
   const [shopName, setShopName] = useState("");
   const [address, setAddress] = useState("");
   const [gstNumber, setGstNumber] = useState("");
-  const [panNumber, setPanNumber] = useState("");
   const [existingShop, setExistingShop] = useState(null);
   const navigate = useNavigate();
 
@@ -38,14 +37,13 @@ export default function ShopSetup() {
       const shopRes = await api.post("/shops/", {
         name: shopName,
         address,
+        gstin: gstNumber,
       });
       const shopId = shopRes.data.id;
 
       // 2️⃣ Create Tax Profile
       await api.post("/taxprofiles/", {
         shop: shopId,
-        gst_number: gstNumber,
-        pan_number: panNumber,
       });
 
       toast.success("Shop created successfully!");
@@ -106,14 +104,6 @@ export default function ShopSetup() {
           type="text"
           value={gstNumber}
           onChange={(e) => setGstNumber(e.target.value)}
-          className="w-full mb-4 p-2 border rounded-lg"
-        />
-
-        <label className="block mb-2 text-gray-700">PAN Number</label>
-        <input
-          type="text"
-          value={panNumber}
-          onChange={(e) => setPanNumber(e.target.value)}
           className="w-full mb-4 p-2 border rounded-lg"
         />
 
