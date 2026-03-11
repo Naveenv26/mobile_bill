@@ -17,10 +17,13 @@ environ.Env.read_env(BASE_DIR / '.env')
 # =======================================
 # Security & Debug
 # =======================================
-SECRET_KEY = env('SECRET_KEY')
-DEBUG = env.bool('DEBUG', default=False)
-_raw_hosts = env('ALLOWED_HOSTS', default='localhost,127.0.0.1')
+import os
+_raw_hosts = os.environ.get('ALLOWED_HOSTS', env('ALLOWED_HOSTS', default='localhost,127.0.0.1'))
 ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(',') if h.strip()]
+if '.onrender.com' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('.onrender.com')
+if '.vercel.app' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('.vercel.app')
 
 # =======================================
 # Applications
@@ -174,15 +177,20 @@ RAZORPAY_WEBHOOK_SECRET = env('RAZORPAY_WEBHOOK_SECRET', default='')
 # CORS & CSRF
 # =======================================
 CORS_ALLOW_CREDENTIALS = True
-FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', env('FRONTEND_URL', default='http://localhost:5173'))
 CORS_ALLOWED_ORIGINS = [FRONTEND_URL, 'http://localhost:5173']
 
-# Parse additional comma-separated origins if provided (for safety scaling)
-_raw_cors = env('ADDITIONAL_CORS_ORIGINS', default='')
+_raw_cors = os.environ.get('ADDITIONAL_CORS_ORIGINS', env('ADDITIONAL_CORS_ORIGINS', default=''))
 for origin in [o.strip() for o in _raw_cors.split(',') if o.strip()]:
     CORS_ALLOWED_ORIGINS.append(origin)
 
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+]
+
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
+if 'https://mobile-bill.onrender.com' not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append('https://mobile-bill.onrender.com')
 # Note: CSRF_TRUSTED_ORIGINS requires the scheme (http/https). FRONTEND_URL has it.
 # =======================================
 # Security Headers
