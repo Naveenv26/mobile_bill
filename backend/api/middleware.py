@@ -23,12 +23,20 @@ class SubscriptionMiddleware(MiddlewareMixin):
 
         # ✅ Cache subscription check for 5 minutes per user
         cache_key = f"sub_valid_{request.user.id}"
-        is_valid = cache.get(cache_key)
+        
+        try:
+            is_valid = cache.get(cache_key)
+        except Exception:
+            is_valid = None
 
         if is_valid is None:
             subscription = getattr(request.user, "usersubscription", None)
             is_valid = subscription.is_valid() if subscription else False
-            cache.set(cache_key, is_valid, timeout=300)  # 5 minutes
+            
+            try:
+                cache.set(cache_key, is_valid, timeout=300)  # 5 minutes
+            except Exception:
+                pass
 
         if not is_valid:
             return JsonResponse(

@@ -37,9 +37,10 @@ class CookieTokenObtainPairView(TokenObtainPairView):
         # 2. Extract tokens
         refresh = resp.data.get("refresh")
         access = resp.data.get("access")
-        
         if refresh:
-            user = self.user  # available via the serializer in TokenObtainPairView
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.user
             
             # --- Enforce 3 Device Limit (Active Refresh Tokens) ---
             # Get all tokens for this user that are NOT blacklisted
