@@ -19,7 +19,8 @@ environ.Env.read_env(BASE_DIR / '.env')
 # =======================================
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+_raw_hosts = env('ALLOWED_HOSTS', default='localhost,127.0.0.1')
+ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(',') if h.strip()]
 
 # =======================================
 # Applications
@@ -177,7 +178,8 @@ FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
 CORS_ALLOWED_ORIGINS = [FRONTEND_URL, 'http://localhost:5173']
 
 # Parse additional comma-separated origins if provided (for safety scaling)
-for origin in env.list('ADDITIONAL_CORS_ORIGINS', default=[]):
+_raw_cors = env('ADDITIONAL_CORS_ORIGINS', default='')
+for origin in [o.strip() for o in _raw_cors.split(',') if o.strip()]:
     CORS_ALLOWED_ORIGINS.append(origin)
 
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
