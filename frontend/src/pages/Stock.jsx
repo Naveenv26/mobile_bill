@@ -7,15 +7,15 @@ import {
 } from "../api/products";
 
 // --- HOOKS ---
+
 const useMediaQuery = (query) => {
-    const [matches, setMatches] = useState(false);
+    const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
     useEffect(() => {
         const media = window.matchMedia(query);
-        if (media.matches !== matches) setMatches(media.matches);
-        const listener = () => setMatches(media.matches);
-        window.addEventListener("resize", listener);
-        return () => window.removeEventListener("resize", listener);
-    }, [matches, query]);
+        const listener = (e) => setMatches(e.matches);
+        media.addEventListener("change", listener);
+        return () => media.removeEventListener("change", listener);
+    }, [query]); // ← only query, NOT matches
     return matches;
 };
 
@@ -85,18 +85,23 @@ export default function Stock() {
     const customUnits = config.inventory?.units || ["pcs", "kg", "ltr", "box"];
     // ---------------------------------
 
-    useEffect(() => { load() }, []);
+    useEffect(() => {
+    load();
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+}, []);
 
     const load = async () => {
-        try {
-            const res = await getProducts();
-            const list = res?.data ?? res;
-            setProducts(Array.isArray(list) ? list : []);
-        } catch (err) {
-            console.error("Failed to load products:", err);
-            setProducts([]);
-        }
-    };
+    try {
+        const products = await getProducts();
+        setProducts(products);
+    } catch (err) {
+        console.error("Failed to load products:", err);
+        setProducts([]);
+    }
+};
+
 
     const save = async (e) => {
         e.preventDefault();
@@ -122,7 +127,7 @@ export default function Stock() {
             msg: `Deleted "${p.name}"`,
             action: async () => {
                 try {
-                    const { id, created_at, updated_at, ...payload } = lastDeleted.current;
+                    const { id: _id, created_at: _ca, updated_at: _ua, ...payload } = lastDeleted.current;
                     await createProduct(payload);
                     await load();
                 } catch (err) {
@@ -157,7 +162,7 @@ export default function Stock() {
     setProducts(prev => prev.map(x => (x.id === p.id ? updatedProduct : x)));
 
     try {
-        const { id, ...payload } = updatedProduct;
+        const { id: _id, ...payload } = updatedProduct;
         await updateProduct(p.id, payload);
     } catch (err) {
         console.error("Quantity update failed:", err.response?.data || err);

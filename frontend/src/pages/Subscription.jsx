@@ -1,5 +1,5 @@
 // frontend/src/pages/Subscription.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useSubscription } from "../context/SubscriptionContext";
 import {
     createRazorpayOrder,
@@ -68,7 +68,7 @@ const SubscriptionModal = () => {
     } = useSubscription();
 
     const [isProcessing, setIsProcessing] = useState(false);
-    const isRazorpayLoaded = useRazorpay();
+    const { isLoaded: isRazorpayLoaded, load: loadRazorpay } = useRazorpay();
 
     const trialUsed = subscription?.trial_used ?? false;
     const isExpired = !isSubscribed && !isOnTrial;
@@ -95,10 +95,13 @@ const SubscriptionModal = () => {
 
     // ── Subscribe with Razorpay ──
     const handleSubscribe = async () => {
-        if (!isRazorpayLoaded) {
-            toast.error("Payment gateway is still loading. Please try again.");
-            return;
-        }
+    setIsProcessing(true);
+    const ready = isRazorpayLoaded || await loadRazorpay();
+    if (!ready) {
+        toast.error("Payment gateway failed to load. Please try again.");
+        setIsProcessing(false);
+        return;
+    }
 
         setIsProcessing(true);
         try {

@@ -1,10 +1,14 @@
 // frontend/src/api/products.js
-import client from "./axios"; // <-- Changed from "./client"
+import client from "./axios";
+
+// Normalize DRF paginated response → always returns a plain array
+const toArray = (data) =>
+  Array.isArray(data) ? data : (data?.results ?? []);
 
 // Get all products
-export const getProducts = async () => {
-  const res = await client.get("/products/"); // updated backend endpoint
-  return res.data; // returns array of products
+export const getProducts = async (params = {}) => {
+  const res = await client.get("/products/", { params });
+  return toArray(res.data);
 };
 
 // Create a new product
@@ -19,7 +23,7 @@ export const updateProduct = async (id, product) => {
   return res.data;
 };
 
-// Soft delete a product by ID (optional)
+// Soft delete a product by ID
 export const deleteProduct = async (id) => {
   const res = await client.delete(`/products/${id}/`);
   return res.data;

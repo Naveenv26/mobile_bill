@@ -1,39 +1,52 @@
 // frontend/src/hooks/useRazorpay.js
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 const SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
 
-const useRazorpay = () => {
-  const [isLoaded, setIsLoaded] = useState(false);
+let scriptPromise = null;
 
-  useEffect(() => {
-    // Check if script is already loaded
+// Loads Razorpay script ONCE, only when called — not on component mount
+const loadRazorpayScript = () => {
+  if (scriptPromise) return scriptPromise;
+
+  scriptPromise = new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${SCRIPT_URL}"]`)) {
-      setIsLoaded(true);
+      resolve(true);
       return;
     }
 
     const script = document.createElement('script');
     script.src = SCRIPT_URL;
     script.async = true;
-    script.onload = () => setIsLoaded(true);
+    script.onload = () => resolve(true);
     script.onerror = () => {
-      console.error('Failed to load Razorpay script');
-      setIsLoaded(false);
+      scriptPromise = null; // allow retry on failure
+      reject(new Error('Failed to load Razorpay script'));
     };
-
     document.body.appendChild(script);
+  });
 
-    return () => {
-      // Find and remove the script if it exists
-      const scriptTag = document.querySelector(`script[src="${SCRIPT_URL}"]`);
-      if (scriptTag) {
-        document.body.removeChild(scriptTag);
-      }
-    };
-  }, []);
+  return scriptPromise;
+};
 
-  return isLoaded;
+const useRazorpay = () => {
+  const [isLoaded, setIsLoaded] = useState(
+    () => !!window.Razorpay // true if already loaded from a previous call
+  );
+
+  // Returns a function to trigger loading on demand
+  const load = async () => {
+    if (isLoaded) return true;
+    try {
+      await loadRazorpayScript();
+      setIsLoaded(true);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return { isLoaded, load };
 };
 
 export default useRazorpay;

@@ -4,6 +4,9 @@ import { getProducts } from "../api/products.js";
 import { createInvoice } from "../api/invoices.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
 import toast from "react-hot-toast";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import { generateThermalPDF } from "../utils/pdfGenerator.js";
 
 // --- Icons ---
@@ -53,22 +56,19 @@ export default function Billing() {
 
   const loadProducts = async () => {
     try {
-      const res = await getProducts();
-      const data = res.data || res;
-      const normalized = Array.isArray(data)
-        ? data.map((p) => ({
-            id: p.id,
-            name: p.name,
-            price: Number(p.price),
-            unit: p.unit,
-            tax_rate: Number(p.tax_rate || p.gst_percent || 0),
-            stock: Number(p.quantity),
-          }))
-        : [];
-      setProducts(normalized);
-    } catch (err) {
-      toast.error("Could not load products.");
-    }
+      const products = await getProducts();
+const normalized = products.map((p) => ({
+  id: p.id,
+  name: p.name,
+  price: Number(p.price),
+  unit: p.unit,
+  tax_rate: Number(p.tax_rate || p.gst_percent || 0),
+  stock: Number(p.quantity),
+}));
+setProducts(normalized);
+    }  catch {
+  toast.error("Could not load products.");
+}
   };
 
   const addToCart = (p) => {
@@ -250,12 +250,12 @@ export default function Billing() {
     doc.text("Thank you for your business!", pageWidth / 2, 280, { align: "center" });
   };
 
-  const handleDownloadAndReset = () => {
+  const _handleDownloadAndReset = async () => {
     setIsGeneratingPDF(true);
     try {
       const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
       const isA4 = paperSize === "A4";
-
+      const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({
           orientation: 'portrait',
           unit: 'mm',
