@@ -13,6 +13,7 @@ python manage.py collectstatic --no-input
 
 echo "--- Applying Migrations to Neon DB ---"
 # Apply database migrations to the external Neon database
-python manage.py migrate
+# We use || true to prevent build failure if the DB is not fully reachable yet (as per request)
+python manage.py migrate --no-input || echo "⚠️ Warning: Migrations failed. Please check your DATABASE_URL."
 
 echo "--- Build Complete ---"
