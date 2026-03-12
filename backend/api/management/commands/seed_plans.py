@@ -1,54 +1,57 @@
-# backend/api/management/commands/seed_plans.py
-from django.core.management.base import BaseCommand
+# backend/seed_plans.py
+
+import os
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+django.setup()
+
 from api.models import SubscriptionPlan
 
-FULL_FEATURES = {
-    "billing": True,
-    "stock": True,
-    "reports": True,
-    "export": True,
-    "expenses": True,
-    "whatsapp": True,
-    "customers": True,
-    "staff": True,
-}
+# Clear old plans
+SubscriptionPlan.objects.all().delete()
+print("Cleared old plans...")
 
-class Command(BaseCommand):
-    help = 'Seeds the required FREE and PRO subscription plans'
+# FREE Trial — 30 days, all features
+SubscriptionPlan.objects.create(
+    name="Free Trial",
+    plan_type="FREE",
+    duration="MONTHLY",
+    price=0,
+    duration_days=30,
+    features={
+        "billing": True,
+        "stock": True,
+        "reports": True,
+        "export": True,
+        "expenses": True,
+        "whatsapp": True,
+        "customers": True,
+        "staff": True,
+    },
+    is_active=True
+)
 
-    def handle(self, *args, **kwargs):
-        free, created = SubscriptionPlan.objects.update_or_create(
-            plan_type='FREE',
-            defaults={
-                'name': 'Free Trial',
-                'duration': 'MONTHLY',
-                'price': 0,
-                'duration_days': 30,
-                'is_active': True,
-                'description': '30-day free trial — full access',
-                'features': FULL_FEATURES,
-            }
-        )
-        self.stdout.write(
-            self.style.SUCCESS(f'{"✅ Created" if created else "🔄 Updated"} FREE plan (id={free.id})')
-        )
+# PRO — ₹300/month, all features
+SubscriptionPlan.objects.create(
+    name="Pro Monthly",
+    plan_type="PRO",
+    duration="MONTHLY",
+    price=300,
+    duration_days=30,
+    features={
+        "billing": True,
+        "stock": True,
+        "reports": True,
+        "export": True,
+        "expenses": True,
+        "whatsapp": True,
+        "customers": True,
+        "staff": True,
+    },
+    is_active=True
+)
 
-        pro, created = SubscriptionPlan.objects.update_or_create(
-            plan_type='PRO',
-            defaults={
-                'name': 'Pro Monthly',
-                'duration': 'MONTHLY',
-                'price': 300,
-                'duration_days': 30,
-                'is_active': True,
-                'description': 'Full access — ₹300/month',
-                'features': FULL_FEATURES,
-            }
-        )
-        self.stdout.write(
-            self.style.SUCCESS(f'{"✅ Created" if created else "🔄 Updated"} PRO plan (id={pro.id})')
-        )
-
-        self.stdout.write(self.style.SUCCESS('\n✅ Seed complete!'))
-        for plan in SubscriptionPlan.objects.all():
-            self.stdout.write(f'   → {plan.name} | ₹{plan.price} | {plan.duration_days} days | active={plan.is_active}')
+print("✅ Plans seeded successfully!")
+for plan in SubscriptionPlan.objects.all():
+    print(f"  - {plan.name} | ₹{plan.price} | {plan.duration_days} days")
