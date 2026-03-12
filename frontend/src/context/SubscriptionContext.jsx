@@ -1,142 +1,129 @@
 // frontend/src/context/SubscriptionContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import client from "../api/axios"; // Use the intercepting client from api/axios.js
-import { toast } from 'react-hot-toast';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import client from "../api/axios";
+import { toast } from "react-hot-toast";
 
-// 1. Create the context (NOT exported)
 const SubscriptionContext = createContext();
 
-// 2. Create a custom hook to use the context (Exported)
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
   if (context === undefined) {
-    throw new Error('useSubscription must be used within a SubscriptionProvider');
+    throw new Error("useSubscription must be used within a SubscriptionProvider");
   }
   return context;
 };
 
-// 3. Create the provider component (Exported)
 export const SubscriptionProvider = ({ children }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [subscription, setSubscription] = useState(null);
-  const [isSubscribed, setIsSubscribed] = useState(false); // Assume false until proven otherwise
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const openModal = () => setIsModalOpen(true);
-  
-  const closeModal = () => {
-    // Only allow closing if they are subscribed or in trial
-    if (isSubscribed || (subscription?.is_trial && subscription?.days_remaining > 0)) {
-      setIsModalOpen(false);
-    } else {
-      toast.error("You must subscribe or start a trial to continue.");
-    }
-  };
-
+  // ── This provider only mounts inside PrivateRoute, so the user
+  //    is guaranteed to be logged in. No token check needed here.
   const fetchSubscription = useCallback(async () => {
-    // If there's no token, we're not logged in. Don't try to fetch.
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setLoading(false);
-      setIsSubscribed(false); // Ensure we are marked as not subscribed
-      setSubscription(null);
-      return; // Stop execution
-    }
-
     setLoading(true);
     try {
-      // This endpoint is defined in api/payment_views.py
       const { data } = await client.get("/payments/subscription-status/");
-      
+
       setSubscription(data.subscription);
       setIsSubscribed(data.is_valid);
-      
-      // This is the paywall: if not valid, open the modal.
+
+      // Auto-open paywall if subscription not valid
       if (!data.is_valid) {
         setIsModalOpen(true);
       }
-
     } catch (err) {
       console.error("Subscription check failed:", err);
-      
-      // Check for 403 (Subscription Expired) from our middleware
-      if (err.response && err.response.status === 403) {
-        toast.error(err.response.data.detail || "Subscription expired. Please pay.");
+
+      // 401 is handled by axios interceptor (redirects to login)
+      // 403 means subscription expired — force paywall
+      if (err.response?.status === 403) {
         setIsSubscribed(false);
         setSubscription(null);
-        setIsModalOpen(true); // Force open paywall
-      } 
-      // 401 (Unauthorized) is handled by the axios interceptor
-      
+        setIsModalOpen(true);
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Fetch status on initial load
+  // Fetch once on mount — user is already logged in at this point
   useEffect(() => {
     fetchSubscription();
   }, [fetchSubscription]);
-  
-  // This effect will re-run fetchSubscription when the user logs in
-  useEffect(() => {
-    const handleLogin = () => {
-      // Small delay to ensure token is set
-      setTimeout(() => {
-        const token = localStorage.getItem("access_token");
-        // Refetch if token exists AND (we have no subscription data OR the subscription is invalid)
-        if (token && (!subscription || !isSubscribed)) {
-          fetchSubscription();
-        }
-      }, 100);
-    };
 
-    // We create a custom event to be fired on successful login
-    window.addEventListener('login-success', handleLogin);
-    
-    const handleLogout = () => {
-      if (!localStorage.getItem("access_token")) {
-        setSubscription(null);
-        setIsSubscribed(false);
-        setIsModalOpen(false);
-      }
-    };
-    // Listen for storage changes (e.g., logout clears token)
-    window.addEventListener('storage', handleLogout);
+  // ── Modal open/close ──
+  const openModal = () => setIsModalOpen(true);
 
-    return () => {
-      window.removeEventListener('login-success', handleLogin);
-      window.removeEventListener('storage', handleLogout);
-    };
-  }, [fetchSubscription, subscription, isSubscribed]);
+  const closeModal = () => {
+    const isOnTrial =
+      subscription?.is_trial && subscription?.days_remaining > 0;
+    const hasAdminOverride = subscription?.allowed_by_admin;
 
-  // --- THIS IS THE FIX (The function definition) ---
-  const hasFeature = useCallback((featureName) => {
-    if (loading || !subscription) {
-      return false; // Not loaded yet
+    if (isSubscribed || isOnTrial || hasAdminOverride) {
+      setIsModalOpen(false);
+    } else {
+      toast.error("Please subscribe or start your free trial to continue.");
     }
-    if (subscription.allowed_by_admin) {
-      return true; // Admin has all features
-    }
-    
-    // Check the plan_details.features object
-    // This path matches your UserSubscriptionSerializer
-    const features = subscription?.plan_details?.features;
-    return features ? features[featureName] === true : false;
-    
-  }, [subscription, loading]);
-  // --- END OF FIX ---
+  };
 
+  // ── Feature check ──
+  // Since we have a single PRO plan with all features included,
+  // this simply returns whether the subscription is valid.
+  const hasFeature = useCallback(
+    (featureName) => {
+      if (loading || !subscription) return false;
+      if (subscription.allowed_by_admin) return true;
+
+      // If subscription is valid, all features are included
+      if (isSubscribed) return true;
+
+      // Trial also gets full access
+      if (subscription.is_trial && subscription.days_remaining > 0) return true;
+
+      return false;
+    },
+    [subscription, isSubscribed, loading]
+  );
+
+  // ── Derived helpers ──
+  const isOnTrial =
+    subscription?.is_trial && (subscription?.days_remaining ?? 0) > 0;
+
+  const daysRemaining = subscription?.days_remaining ?? 0;
+
+  const subscriptionStatus = subscription
+    ? isSubscribed
+      ? "active"
+      : isOnTrial
+        ? "trial"
+        : "expired"
+    : "none";
 
   const value = {
+    // State
     isModalOpen,
-    openModal,
-    closeModal,
     subscription,
     isSubscribed,
     loading,
-    refetchSubscription: fetchSubscription, // Expose the refetch function
-    hasFeature, // <-- AND THIS IS THE FIX (Adding it to the value)
+
+    // Derived
+    isOnTrial,
+    daysRemaining,
+    subscriptionStatus, // 'active' | 'trial' | 'expired' | 'none'
+
+    // Actions
+    openModal,
+    closeModal,
+    hasFeature,
+    refetchSubscription: fetchSubscription,
   };
 
   return (

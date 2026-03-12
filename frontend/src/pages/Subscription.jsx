@@ -1,214 +1,88 @@
 // frontend/src/pages/Subscription.jsx
-import React, { useEffect, useState } from 'react';
-import { useSubscription } from '../context/SubscriptionContext';
-import { 
-    getSubscriptionPlans, 
-    createRazorpayOrder, 
+import React, { useEffect, useState } from "react";
+import { useSubscription } from "../context/SubscriptionContext";
+import {
+    createRazorpayOrder,
     verifyRazorpayPayment,
-    startFreeTrial 
-} from '../api/payments';
-import useRazorpay from '../hooks/useRazorpay';
-import { Check, X, Star, Zap, TrendingUp, Crown, Loader2, ShieldCheck } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+    startFreeTrial,
+} from "../api/payments";
+import useRazorpay from "../hooks/useRazorpay";
+import {
+    Check,
+    X,
+    Star,
+    TrendingUp,
+    Loader2,
+    ShieldCheck,
+    Clock,
+} from "lucide-react";
+import { toast } from "react-hot-toast";
 
-const iconMap = {
-    FREE: Star,
-    BASIC: Zap,
-    PRO: TrendingUp, 
-    PREMIUM: Crown, 
-};
+// ── Feature list for our single PRO plan ──
+const ALL_FEATURES = [
+    "Dashboard & Analytics",
+    "Billing & Invoice Generation",
+    "PDF Invoice Download",
+    "WhatsApp Invoice Sharing",
+    "Stock & Inventory Management",
+    "Low Stock Alerts",
+    "Customer Management",
+    "Loyalty Points System",
+    "Sales Reports",
+    "CSV Product Import",
+    "Multi-staff Access",
+    "Tax Profile Management",
+];
 
-const colorMap = {
-    FREE: {
-        border: 'border-gray-300',
-        bg: 'bg-gray-100',
-        text: 'text-gray-600',
-        button: 'bg-green-600 hover:bg-green-700',
-        iconBg: 'bg-gray-200',
-    },
-    BASIC: {
-        border: 'border-blue-400',
-        bg: 'bg-blue-50',
-        text: 'text-blue-600',
-        button: 'bg-blue-600 hover:bg-blue-700',
-        iconBg: 'bg-blue-100',
-    },
-    PRO: {
-        border: 'border-purple-400',
-        bg: 'bg-purple-50',
-        text: 'text-purple-600',
-        button: 'bg-purple-600 hover:bg-purple-700',
-        iconBg: 'bg-purple-100',
-    },
-    PREMIUM: {
-        border: 'border-amber-400',
-        bg: 'bg-amber-50',
-        text: 'text-amber-600',
-        button: 'bg-amber-600 hover:bg-amber-700',
-        iconBg: 'bg-amber-100',
-    },
-};
+const FREE_FEATURES = [
+    "Dashboard & Analytics",
+    "Billing & Invoice Generation",
+    "Stock & Inventory Management",
+    "Customer Management",
+    "Sales Reports",
+];
 
-// --- MODIFIED: Highlight prop ---
-const Feature = ({ text, included, highlight }) => (
-    <li className="flex items-start">
+// ── Single feature row ──
+const Feature = ({ text, included }) => (
+    <li className="flex items-center gap-2">
         {included ? (
-            <Check className={`w-5 h-5 mr-2 flex-shrink-0 mt-0.5 ${highlight ? 'text-emerald-500' : 'text-green-500'}`} />
+            <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
         ) : (
-            <X className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0 mt-0.5" />
+            <X className="w-4 h-4 text-gray-300 flex-shrink-0" />
         )}
-        <span className={`text-sm ${included ? (highlight ? 'text-emerald-700 font-bold' : 'text-gray-800') : 'text-gray-500'}`}>
+        <span className={`text-sm ${included ? "text-gray-800" : "text-gray-400"}`}>
             {text}
         </span>
     </li>
 );
 
-const PlanCard = ({ plan, currentPlanType, isSubscribed, onSubscribe, onStartTrial, isProcessing, trialUsed }) => {
-    const { plan_type = 'FREE', name, price, duration, features, duration_days } = plan;
-    const Icon = iconMap[plan_type] || Star;
-    const color = colorMap[plan_type] || colorMap.FREE;
-    
-    const isActive = currentPlanType === plan_type && isSubscribed;
-    
-    // Check for highlight condition
-    const isProOrPremium = ['PRO', 'PREMIUM'].includes(plan_type);
-
-    const featureList = [
-        { text: 'Dashboard Access', included: features?.dashboard },
-        { text: 'Stock Maintenance', included: features?.stock },
-        { text: 'Billing & Invoicing', included: features?.billing },
-        { text: `Max ${features?.max_bills_per_week === -1 ? 'Unlimited' : (features?.max_bills_per_week + ' Bills/Week')}`, included: features?.billing },
-        { text: 'Sales Reports', included: features?.reports },
-        { text: 'Excel Export', included: features?.export },
-        // --- GREEN HIGHLIGHT ---
-        { 
-            text: 'WhatsApp Reports (Tally/Amount)', 
-            included: features?.whatsapp_reports,
-            highlight: isProOrPremium && features?.whatsapp_reports 
-        }, 
-    ];
-
-    const handleAction = () => {
-        if (plan_type === 'FREE') {
-            onStartTrial();
-        } else {
-            onSubscribe(plan);
-        }
-    };
-
-    const getButtonText = () => {
-        if (isActive) return 'Current Plan';
-        if (isProcessing) return 'Processing...';
-        if (plan_type === 'FREE') {
-            return trialUsed ? 'Trial Used' : 'Start 7-Day Trial';
-        }
-        if (currentPlanType === plan_type && !isSubscribed) {
-            return "Renew Plan";
-        }
-        return 'Upgrade Now';
-    };
-
-    return (
-        <div className={`relative rounded-2xl shadow-lg border-2 hover:shadow-xl transition-all duration-300 p-6 ${color.border} ${color.bg} ${isActive ? 'ring-2 ring-green-500' : ''}`}>
-            {plan_type === 'PRO' && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-purple-600 text-white px-4 py-1 text-xs font-semibold rounded-full shadow">
-                        Most Popular
-                    </span>
-                </div>
-            )}
-            
-            {isActive && (
-                <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 text-xs rounded-full flex items-center">
-                    <ShieldCheck className="w-3 h-3 mr-1" />
-                    Active
-                </div>
-            )}
-
-            <div className="flex items-center mb-4">
-                <div className={`p-3 rounded-xl ${color.iconBg}`}>
-                    <Icon className={`w-7 h-7 ${color.text}`} />
-                </div>
-                <h3 className="ml-3 text-2xl font-bold text-gray-900">{name}</h3>
-            </div>
-
-            <div className="mb-6">
-                <div className="flex items-baseline">
-                    <span className="text-4xl font-extrabold text-gray-900">₹{Math.round(price)}</span>
-                    <span className="ml-2 text-gray-600 text-sm">
-                        / {duration === 'YEARLY' ? 'year' : 'month'}
-                    </span>
-                </div>
-                {plan_type === 'FREE' && <p className="text-gray-600 text-sm mt-1">{duration_days}-Day Free Trial</p>}
-            </div>
-
-            <ul className="space-y-3 mb-8">
-                {featureList.map((f, i) => f.text && f.included !== undefined && <Feature key={i} text={f.text} included={f.included} highlight={f.highlight} />)}
-            </ul>
-
-            <button
-                onClick={handleAction}
-                disabled={isActive || isProcessing || (plan_type === 'FREE' && trialUsed)}
-                className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-200 flex items-center justify-center ${
-                    isActive || (plan_type === 'FREE' && trialUsed)
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : isProcessing
-                        ? 'bg-gray-400 cursor-wait'
-                        : color.button
-                }`}
-            >
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : null}
-                {getButtonText()}
-            </button>
-        </div>
-    );
-};
-
 const SubscriptionModal = () => {
-    const { isModalOpen, closeModal, subscription, isSubscribed, refetchSubscription } = useSubscription();
-    const [plans, setPlans] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const {
+        isModalOpen,
+        closeModal,
+        subscription,
+        isSubscribed,
+        isOnTrial,
+        daysRemaining,
+        refetchSubscription,
+    } = useSubscription();
+
     const [isProcessing, setIsProcessing] = useState(false);
-    
     const isRazorpayLoaded = useRazorpay();
 
-    const currentPlanType = subscription?.plan_type || 'FREE';
-    const isTrial = subscription?.is_trial;
-    const daysRemaining = subscription?.days_remaining;
-    const trialUsed = subscription?.trial_used || false;
+    const trialUsed = subscription?.trial_used ?? false;
+    const isExpired = !isSubscribed && !isOnTrial;
 
-    useEffect(() => {
-        if (isModalOpen) {
-            setIsLoading(true);
-            getSubscriptionPlans()
-                .then(data => {
-                    const filteredPlans = data.filter(p => 
-                        p.plan_type === 'FREE' || 
-                        (p.duration === 'MONTHLY' && (p.plan_type === 'BASIC' || p.plan_type === 'PRO'))
-                    );
-                    const planOrder = { 'FREE': 1, 'BASIC': 2, 'PRO': 3 };
-                    const sortedData = filteredPlans.sort((a, b) => 
-                        (planOrder[a.plan_type] || 99) - (planOrder[b.plan_type] || 99)
-                    );
-                    setPlans(sortedData);
-                })
-                .catch(err => {
-                    console.error('Failed to load plans:', err);
-                    toast.error('Could not load subscription plans.');
-                })
-                .finally(() => setIsLoading(false));
-        }
-    }, [isModalOpen]);
-
+    // ── Start free trial ──
     const handleStartTrial = async () => {
         if (trialUsed) {
-            toast.error("Trial has already been used.");
+            toast.error("Your free trial has already been used.");
             return;
         }
         setIsProcessing(true);
         try {
             await startFreeTrial();
-            toast.success("Free trial started!");
+            toast.success("Your 30-day free trial is now active!");
             await refetchSubscription();
             closeModal();
         } catch (err) {
@@ -219,23 +93,38 @@ const SubscriptionModal = () => {
         }
     };
 
-    const handleSubscribe = async (plan) => {
+    // ── Subscribe with Razorpay ──
+    const handleSubscribe = async () => {
         if (!isRazorpayLoaded) {
-            toast.error("Payment gateway is still loading. Please wait a moment.");
+            toast.error("Payment gateway is still loading. Please try again.");
             return;
         }
-        
+
         setIsProcessing(true);
         try {
-            const orderData = await createRazorpayOrder(plan.id);
-            if (!orderData || !orderData.order_id) throw new Error("Failed to create order");
+            // We only have one PRO plan — backend picks it by plan_type
+            // Pass plan_id=null and let backend find the active PRO plan,
+            // OR fetch plan list first. Here we fetch to get the ID.
+            const plansRes = await import("../api/payments").then((m) =>
+                m.getSubscriptionPlans()
+            );
+            const proPlan = plansRes.find((p) => p.plan_type === "PRO" && p.is_active);
+
+            if (!proPlan) {
+                toast.error("No active plan found. Please contact support.");
+                setIsProcessing(false);
+                return;
+            }
+
+            const orderData = await createRazorpayOrder(proPlan.id);
+            if (!orderData?.order_id) throw new Error("Failed to create order");
 
             const options = {
                 key: orderData.key,
                 amount: orderData.amount,
                 currency: orderData.currency,
-                name: "SmartBill Subscription",
-                description: `Payment for ${plan.name}`,
+                name: "SmartBill",
+                description: "Pro Monthly Subscription — ₹300/month",
                 order_id: orderData.order_id,
                 handler: async (response) => {
                     try {
@@ -244,37 +133,34 @@ const SubscriptionModal = () => {
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
                         });
-                        
                         toast.success("Payment successful! Subscription activated.");
                         await refetchSubscription();
                         closeModal();
-                    } catch (verifyErr) {
-                        console.error("Verification failed:", verifyErr);
+                    } catch (err) {
+                        console.error("Verification failed:", err);
                         toast.error("Payment verification failed. Please contact support.");
                     } finally {
                         setIsProcessing(false);
                     }
                 },
                 prefill: {
-                    name: orderData.user_name || "Valued Customer",
+                    name: orderData.user_name || "",
                     email: orderData.user_email || "",
                 },
                 theme: { color: "#4f46e5" },
                 modal: {
                     ondismiss: () => {
                         setIsProcessing(false);
-                        if (!isModalOpen) return;
-                        toast.error("Payment was cancelled.");
+                        toast("Payment cancelled.", { icon: "ℹ️" });
                     },
                 },
             };
 
             const rzp = new window.Razorpay(options);
             rzp.open();
-
-        } catch (orderErr) {
-            console.error("Order creation failed:", orderErr);
-            toast.error(orderErr.response?.data?.error || "Failed to create payment order.");
+        } catch (err) {
+            console.error("Order creation failed:", err);
+            toast.error(err.response?.data?.error || "Failed to initiate payment.");
             setIsProcessing(false);
         }
     };
@@ -282,57 +168,151 @@ const SubscriptionModal = () => {
     if (!isModalOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-start p-2 md:p-4 pt-4 md:pt-10">
-            <div className="bg-gradient-to-br from-gray-50 to-gray-200 p-4 md:p-6 rounded-2xl shadow-2xl max-w-full sm:max-w-4xl w-full max-h-[95vh] overflow-y-auto relative">
-                <button onClick={closeModal} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1">
-                    <X size={24} />
-                </button>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto relative">
 
-                <div className="text-center mb-6 md:mb-8">
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">Subscription Plans</h1>
-                    <p className="text-base text-gray-600">Choose the best plan for your business</p>
-                    {subscription && (isTrial || trialUsed) && daysRemaining <= 0 && !isSubscribed && (
-                        <p className="text-base text-red-600 font-semibold mt-2">Your trial has expired. Please upgrade to continue.</p>
+                {/* Close button — only shows if user has active access */}
+                {(isSubscribed || isOnTrial) && (
+                    <button
+                        onClick={closeModal}
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition"
+                    >
+                        <X size={22} />
+                    </button>
+                )}
+
+                {/* Header */}
+                <div className="text-center p-8 pb-4">
+                    <h1 className="text-3xl font-bold text-slate-900">SmartBill Plans</h1>
+                    <p className="text-slate-500 mt-2">
+                        Start free, upgrade anytime. Cancel anytime.
+                    </p>
+
+                    {/* Status banner */}
+                    {isOnTrial && (
+                        <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold border border-blue-200">
+                            <Clock className="w-4 h-4" />
+                            Free trial active — {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
+                        </div>
                     )}
-                    {subscription && isTrial && daysRemaining > 0 && (
-                        <p className="text-base text-green-600 font-semibold mt-2">You are on a free trial. {daysRemaining} {daysRemaining > 1 ? 'days' : 'day'} remaining.</p>
+                    {isExpired && !isOnTrial && trialUsed && (
+                        <div className="mt-4 inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-full text-sm font-semibold border border-red-200">
+                            Your subscription has expired. Renew to continue.
+                        </div>
+                    )}
+                    {isSubscribed && (
+                        <div className="mt-4 inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-semibold border border-green-200">
+                            <ShieldCheck className="w-4 h-4" />
+                            Pro plan active — {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
+                        </div>
                     )}
                 </div>
 
-                {isLoading ? (
-                    <div className="flex justify-center items-center h-48">
-                        <Loader2 className="w-10 h-10 text-purple-600 animate-spin" />
-                        <p className="ml-4 text-gray-600">Loading plans...</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {plans.map((plan) => (
-                            <PlanCard
-                                key={plan.id}
-                                plan={plan}
-                                currentPlanType={currentPlanType}
-                                isSubscribed={isSubscribed} 
-                                onSubscribe={handleSubscribe}
-                                onStartTrial={handleStartTrial}
-                                isProcessing={isProcessing}
-                                trialUsed={trialUsed}
-                            />
-                        ))}
-                        
-                        <div className="p-6 bg-slate-100 rounded-2xl border-2 border-slate-300 text-center flex flex-col justify-center items-center col-span-1 sm:col-span-2 lg:col-span-1">
-                            <h4 className="font-bold text-lg text-slate-800 flex items-center mb-2">
-                                <Crown className="w-5 h-5 mr-2 text-slate-600" />
-                                Custom Enterprise Plan
-                            </h4>
-                            <p className="text-sm text-slate-600 mb-4">
-                                Need more? Contact sales for **PREMIUM** plans with unlimited usage, dedicated support, and custom integrations.
-                            </p>
-                            <a href="mailto:support@smartbill.com" className="bg-amber-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-amber-700 transition">
-                                Contact Sales Team
-                            </a>
+                {/* Plans */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 pt-4">
+
+                    {/* ── FREE TRIAL CARD ── */}
+                    <div className="border-2 border-gray-200 rounded-2xl p-6 bg-gray-50">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-gray-200 rounded-xl">
+                                <Star className="w-6 h-6 text-gray-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Free Trial</h3>
+                                <p className="text-sm text-gray-500">30 days, no card needed</p>
+                            </div>
                         </div>
+
+                        <div className="mb-6">
+                            <span className="text-4xl font-extrabold text-gray-900">₹0</span>
+                            <span className="text-gray-500 text-sm ml-2">for 30 days</span>
+                        </div>
+
+                        <ul className="space-y-2 mb-8">
+                            {ALL_FEATURES.map((f) => (
+                                <Feature
+                                    key={f}
+                                    text={f}
+                                    included={FREE_FEATURES.includes(f)}
+                                />
+                            ))}
+                        </ul>
+
+                        <button
+                            onClick={handleStartTrial}
+                            disabled={trialUsed || isProcessing || isSubscribed}
+                            className="w-full py-3 rounded-xl font-bold text-white transition disabled:cursor-not-allowed
+                bg-gray-700 hover:bg-gray-800 disabled:bg-gray-300"
+                        >
+                            {isProcessing
+                                ? "Starting..."
+                                : trialUsed
+                                    ? "Trial Already Used"
+                                    : isSubscribed
+                                        ? "Subscribed"
+                                        : "Start Free Trial"}
+                        </button>
                     </div>
-                )}
+
+                    {/* ── PRO PLAN CARD ── */}
+                    <div className="border-2 border-indigo-500 rounded-2xl p-6 bg-indigo-50 relative">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                            <span className="bg-indigo-600 text-white px-4 py-1 text-xs font-bold rounded-full shadow">
+                                RECOMMENDED
+                            </span>
+                        </div>
+
+                        {isSubscribed && (
+                            <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" />
+                                Active
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-indigo-100 rounded-xl">
+                                <TrendingUp className="w-6 h-6 text-indigo-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Pro</h3>
+                                <p className="text-sm text-indigo-600 font-medium">All features included</p>
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <span className="text-4xl font-extrabold text-gray-900">₹300</span>
+                            <span className="text-gray-500 text-sm ml-2">/ month</span>
+                        </div>
+
+                        <ul className="space-y-2 mb-8">
+                            {ALL_FEATURES.map((f) => (
+                                <Feature key={f} text={f} included={true} />
+                            ))}
+                        </ul>
+
+                        <button
+                            onClick={handleSubscribe}
+                            disabled={isSubscribed || isProcessing}
+                            className="w-full py-3 rounded-xl font-bold text-white transition disabled:cursor-not-allowed
+                bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 shadow-lg shadow-indigo-200"
+                        >
+                            {isProcessing ? (
+                                <span className="flex items-center justify-center gap-2">
+                                    <Loader2 className="animate-spin w-4 h-4" />
+                                    Processing...
+                                </span>
+                            ) : isSubscribed ? (
+                                "Current Plan"
+                            ) : (
+                                "Subscribe Now — ₹300/month"
+                            )}
+                        </button>
+                    </div>
+                </div>
+
+                <p className="text-center text-xs text-gray-400 pb-6">
+                    Payments secured by Razorpay. Cancel anytime by not renewing.
+                </p>
             </div>
         </div>
     );
