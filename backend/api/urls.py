@@ -8,7 +8,6 @@ from sales.views import invoice_pdf, invoice_whatsapp
 from .views import (
     ResetPasswordView,
     check_subscription,
-    create_order,
     SubscriptionPlanViewSet,
     RegisterView,
     ProductViewSet,
@@ -22,13 +21,11 @@ from .views import (
     FeedbackViewSet,
 )
 
-# Auth
+# create_order imported from payment_views (the full, correct version)
+from .payment_views import create_order
+
 from .auth_views import CookieTokenObtainPairView, CookieTokenRefreshView, logout_view
-
-# Shop
 from shops.views import register_shop, TaxProfileViewSet, AdminShopViewSet
-
-# Razorpay
 from .razorpay_webhook import razorpay_webhook
 from .payment_views import (
     verify_payment,

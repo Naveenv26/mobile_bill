@@ -246,38 +246,6 @@ RAZORPAY_KEY_SECRET = settings.RAZORPAY_KEY_SECRET
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def create_order(request):
-    plan_id = request.data.get("plan_id")
-    try:
-        plan = SubscriptionPlan.objects.get(id=plan_id)
-    except SubscriptionPlan.DoesNotExist:
-        return Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    amount_paise = int(plan.price * 100)
-
-    order = razorpay_client.order.create({
-        "amount": amount_paise,
-        "currency": "INR",
-        "payment_capture": 1
-    })
-
-    payment = Payment.objects.create(
-        user=request.user,
-        plan=plan,
-        order_id=order["id"],
-        amount=plan.price,
-        status="created"
-    )
-
-    return Response({
-        "order_id": order["id"],
-        "amount": amount_paise,
-        "currency": "INR",
-        "key": RAZORPAY_KEY_ID
-    })
-
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
