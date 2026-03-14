@@ -1,33 +1,32 @@
 // frontend/src/api/invoices.js
-import client from "./axios"; // <-- Changed from "./client"
+import client from "./axios";
 
-// Create invoice (matches backend payload)
+// Normalize DRF paginated response → always returns a plain array
+const toArray = (data) =>
+  Array.isArray(data) ? data : (data?.results ?? []);
+
+// Create invoice
 export const createInvoice = async (data) => {
-  // --- THIS IS THE FIX ---
-  // Backend expects flat customer_name, customer_mobile, and shop ID.
   const payload = {
-    shop: data.shop, // Pass the shop ID from Billing.jsx
-    customer_name: data.customer_name || "Walk-in", // Use flat field
-    customer_mobile: data.customer_mobile || "", // Use flat field
+    shop: data.shop,
+    customer_name: data.customer_name || "Walk-in",
+    customer_mobile: data.customer_mobile || "",
     items: data.items.map((c) => ({
-      product: c.product, // product ID
+      product: c.product,
       qty: c.qty,
       unit_price: c.unit_price,
       tax_rate: c.tax_rate,
     })),
-    grand_total: data.grand_total, // Send the calculated grand total
+    grand_total: data.grand_total,
   };
-  // -------------------------
-
   const res = await client.post("/invoices/", payload);
   return res.data;
 };
 
-// Get all invoices
-export const getInvoices = async () => {
-  const res = await client.get("/invoices/");
-  // Handle both {data: [...]} and [...] responses
-  return res?.data || res || []; 
+// Get all invoices — always returns a plain array
+export const getInvoices = async (params = {}) => {
+  const res = await client.get("/invoices/", { params });
+  return toArray(res.data);
 };
 
 // Get single invoice
