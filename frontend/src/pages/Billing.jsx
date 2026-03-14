@@ -161,17 +161,34 @@ setProducts(normalized);
     doc.setTextColor(0, 0, 0);
     doc.text(currentShop.name || "Shop Name", margin, 20);
     
-    doc.setFontSize(10);
+doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
-    doc.text(currentShop.address || "", margin, 26);
-    doc.text(`Phone: ${currentShop.contact_phone || ""}`, margin, 31);
-    if (currentShop.contact_email) doc.text(currentShop.contact_email, margin, 36);
 
-    doc.line(margin, 42, pageWidth - margin, 42);
+    let addrY = 28;
+    const usableW = pageWidth / 2 - margin - 10;
+    if (currentShop.address) {
+      const addrLines = doc.splitTextToSize(currentShop.address, usableW);
+      addrLines.forEach((line) => {
+        doc.text(line, margin, addrY);
+        addrY += 5;
+      });
+    }
+    if (currentShop.contact_phone) {
+      doc.text(`Phone: ${currentShop.contact_phone}`, margin, addrY);
+      addrY += 5;
+    }
+    if (currentShop.contact_email) {
+      doc.text(currentShop.contact_email, margin, addrY);
+      addrY += 5;
+    }
+
+    const lineY = Math.max(addrY + 2, 38);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, lineY, pageWidth - margin, lineY);
 
     // Bill To & Invoice Details
-    const startY = 55;
+    const startY = lineY + 12;
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
     doc.text("Bill To:", margin, startY);
