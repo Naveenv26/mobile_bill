@@ -107,6 +107,5 @@ export const generateThermalPDF = (printData, currentShop) => {
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.text("Thank you for your visit!", 40, finalY, { align: "center" });
-
-    doc.save(`Receipt_${printData.number || printData.id || "New"}.pdf`);
+    return doc;
 };

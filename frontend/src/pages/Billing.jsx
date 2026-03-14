@@ -273,18 +273,14 @@ doc.setFontSize(9);
       const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
       const isA4 = paperSize === "A4";
       const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: isA4 ? 'a4' : [80, 200]
-      });
-
       if (isA4) {
+          const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
           generateA4PDF(doc, invoiceData);
+          doc.save(`Invoice_${invoiceData?.number || 'Bill'}.pdf`);
       } else {
-          generateThermalPDF(doc, invoiceData); // Assuming handleGeneratePDF was a typo for generateThermalPDF
+          const doc = generateThermalPDF(invoiceData, currentShop);
+          doc.save(`Invoice_${invoiceData?.number || 'Bill'}.pdf`);
       }
-      doc.save(`Invoice_${invoiceData?.number || 'Bill'}.pdf`);
     } catch (err) {
       console.error("PDF Gen Error:", err);
       toast.error("Failed to generate PDF");
@@ -294,23 +290,19 @@ doc.setFontSize(9);
     }
   };
 
-  const generatePDFFile = (dataToPrint, forceA4 = false) => {
+ const generatePDFFile = (dataToPrint, forceA4 = false) => {
     const paperSize = forceA4 ? "A4" : (currentShop?.config?.invoice?.paper_size || "80mm");
     const isA4 = paperSize === "A4";
 
-    const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: isA4 ? 'a4' : [80, 200]
-    });
-
     if (isA4) {
-        generateA4PDF(doc, dataToPrint || invoiceData);
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      generateA4PDF(doc, dataToPrint || invoiceData);
+      return doc.output('blob');
     } else {
-        generateThermalPDF(doc, dataToPrint || invoiceData);
+      // generateThermalPDF creates and returns its own doc
+      const doc = generateThermalPDF(dataToPrint || invoiceData, currentShop);
+      return doc.output('blob');
     }
-
-    return doc.output('blob');
   };
 
   const handleShare = async () => {
