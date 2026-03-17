@@ -37,7 +37,7 @@ class Command(BaseCommand):
             defaults={
                 'name': 'Pro Monthly',
                 'duration': 'MONTHLY',
-                'price': 300,
+                'price': 1,
                 'duration_days': 30,
                 'is_active': True,
                 'features': FULL_FEATURES,
