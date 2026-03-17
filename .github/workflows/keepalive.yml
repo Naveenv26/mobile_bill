@@ -1,0 +1,14 @@
+name: Keep Server Warm
+
+on:
+  schedule:
+    # Every 10 minutes, 8 AM to 9 PM IST (2:30 AM to 3:30 PM UTC)
+    - cron: '*/10 2-15 * * *'
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          curl -s ${{ secrets.RENDER_URL }}/api/health/ || true
