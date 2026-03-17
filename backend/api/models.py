@@ -103,14 +103,18 @@ class UserSubscription(models.Model):
     # --------------------------------------------------
     def activate_paid_plan(self, plan):
         """
-        Activates ₹300/month PRO plan after successful payment.
-        Clears all trial fields.
+        Activates or EXTENDS the PRO plan after successful payment.
+        If subscription is still active, adds days on top of existing end_date.
+        If expired, starts fresh from now.
         """
         self.plan = plan
         self.active = True
         self.start_date = timezone.now()
-        self.end_date = timezone.now() + timedelta(days=plan.duration_days)
         self.grace_period_end = None
+
+        # ✅ Extend from existing end_date if still active, otherwise start fresh
+        base = self.end_date if (self.end_date and self.end_date > timezone.now()) else timezone.now()
+        self.end_date = base + timedelta(days=plan.duration_days)
 
         # Clear trial fields — user is now on paid plan
         self.trial_start_date = None

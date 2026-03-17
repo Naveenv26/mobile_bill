@@ -4,7 +4,8 @@ import client from "./axios";
 // Get all available subscription plans
 export const getSubscriptionPlans = async () => {
   const res = await client.get("/subscription-plans/");
-  return res.data;
+  const data = res.data;
+  return Array.isArray(data) ? data : (data?.results ?? []);
 };
 
 // Create a new Razorpay order

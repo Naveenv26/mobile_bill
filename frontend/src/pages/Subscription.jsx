@@ -5,6 +5,7 @@ import {
     createRazorpayOrder,
     verifyRazorpayPayment,
     startFreeTrial,
+    getSubscriptionPlans,
 } from "../api/payments";
 import useRazorpay from "../hooks/useRazorpay";
 import {
@@ -15,10 +16,12 @@ import {
     Loader2,
     ShieldCheck,
     Clock,
+    CalendarDays,
+    Zap,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-// ── Feature list for our single PRO plan ──
+// ── All features — shown on BOTH cards ──────────────────────
 const ALL_FEATURES = [
     "Dashboard & Analytics",
     "Billing & Invoice Generation",
@@ -27,22 +30,15 @@ const ALL_FEATURES = [
     "Stock & Inventory Management",
     "Low Stock Alerts",
     "Customer Management",
-    "Loyalty Points System",
     "Sales Reports",
     "CSV Product Import",
     "Multi-staff Access",
     "Tax Profile Management",
 ];
 
-const FREE_FEATURES = [
-    "Dashboard & Analytics",
-    "Billing & Invoice Generation",
-    "Stock & Inventory Management",
-    "Customer Management",
-    "Sales Reports",
-];
+// Features NOT included in paid PRO (all included in trial too)
+const PRO_EXCLUDED = [];
 
-// ── Single feature row ──
 const Feature = ({ text, included }) => (
     <li className="flex items-center gap-2">
         {included ? (
@@ -56,6 +52,21 @@ const Feature = ({ text, included }) => (
     </li>
 );
 
+// ── Validity badge shown when user has active subscription ───
+const ValidityBadge = ({ label, date, daysRemaining, color }) => (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${color} mb-2`}>
+        <CalendarDays className="w-5 h-5 flex-shrink-0" />
+        <div>
+            <p className="text-xs font-bold uppercase tracking-wide opacity-70">{label}</p>
+            <p className="text-sm font-extrabold">
+                Valid till {new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                <span className="ml-2 opacity-70">({daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left)</span>
+            </p>
+        </div>
+    </div>
+);
+
+// ── Main Modal ───────────────────────────────────────────────
 const SubscriptionModal = () => {
     const {
         isModalOpen,
@@ -70,48 +81,42 @@ const SubscriptionModal = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const { isLoaded: isRazorpayLoaded, load: loadRazorpay } = useRazorpay();
 
-    const trialUsed = subscription?.trial_used ?? false;
-    const isExpired = !isSubscribed && !isOnTrial;
+    const trialUsed    = subscription?.trial_used ?? false;
+    const isExpired    = !isSubscribed && !isOnTrial;
+    const canClose     = isSubscribed || isOnTrial;
 
-    // ── Start free trial ──
+    // Current validity end date
+    const validUntil   = subscription?.end_date || subscription?.trial_end_date || null;
+
+    // ── Start free trial ────────────────────────────────────
     const handleStartTrial = async () => {
-        if (trialUsed) {
-            toast.error("Your free trial has already been used.");
-            return;
-        }
+        if (trialUsed) { toast.error("Free trial already used."); return; }
         setIsProcessing(true);
         try {
             await startFreeTrial();
-            toast.success("Your 30-day free trial is now active!");
+            toast.success("🎉 Your 30-day free trial is now active! All features unlocked.");
             await refetchSubscription();
             closeModal();
         } catch (err) {
-            console.error("Trial start failed:", err);
             toast.error(err.response?.data?.error || "Failed to start trial.");
         } finally {
             setIsProcessing(false);
         }
     };
 
-    // ── Subscribe with Razorpay ──
+    // ── Subscribe / Extend ──────────────────────────────────
     const handleSubscribe = async () => {
-    setIsProcessing(true);
-    const ready = isRazorpayLoaded || await loadRazorpay();
-    if (!ready) {
-        toast.error("Payment gateway failed to load. Please try again.");
-        setIsProcessing(false);
-        return;
-    }
-
         setIsProcessing(true);
+        const ready = isRazorpayLoaded || await loadRazorpay();
+        if (!ready) {
+            toast.error("Payment gateway failed to load. Please try again.");
+            setIsProcessing(false);
+            return;
+        }
+
         try {
-            // We only have one PRO plan — backend picks it by plan_type
-            // Pass plan_id=null and let backend find the active PRO plan,
-            // OR fetch plan list first. Here we fetch to get the ID.
-            const plansRes = await import("../api/payments").then((m) =>
-                m.getSubscriptionPlans()
-            );
-            const proPlan = plansRes.find((p) => p.plan_type === "PRO" && p.is_active);
+            const plans   = await getSubscriptionPlans();
+            const proPlan = plans.find((p) => p.plan_type === "PRO" && p.is_active);
 
             if (!proPlan) {
                 toast.error("No active plan found. Please contact support.");
@@ -122,32 +127,41 @@ const SubscriptionModal = () => {
             const orderData = await createRazorpayOrder(proPlan.id);
             if (!orderData?.order_id) throw new Error("Failed to create order");
 
+            // Show what the user is getting
+            const extendMsg = isSubscribed
+                ? `Extends your plan by 30 days (new expiry: ${new Date(
+                    new Date(validUntil).getTime() + 30 * 24 * 60 * 60 * 1000
+                  ).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })})`
+                : "Pro Monthly Subscription — ₹300/month";
+
             const options = {
-                key: orderData.key,
-                amount: orderData.amount,
-                currency: orderData.currency,
-                name: "SmartBill",
-                description: "Pro Monthly Subscription — ₹300/month",
-                order_id: orderData.order_id,
+                key:         orderData.key,
+                amount:      orderData.amount,
+                currency:    orderData.currency,
+                name:        "SmartBill",
+                description: extendMsg,
+                order_id:    orderData.order_id,
                 handler: async (response) => {
                     try {
                         await verifyRazorpayPayment({
-                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_order_id:   response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_signature: response.razorpay_signature,
+                            razorpay_signature:  response.razorpay_signature,
                         });
-                        toast.success("Payment successful! Subscription activated.");
+                        toast.success(isSubscribed
+                            ? "✅ Subscription extended by 30 days!"
+                            : "✅ Payment successful! Subscription activated."
+                        );
                         await refetchSubscription();
                         closeModal();
-                    } catch (err) {
-                        console.error("Verification failed:", err);
+                    } catch  {
                         toast.error("Payment verification failed. Please contact support.");
                     } finally {
                         setIsProcessing(false);
                     }
                 },
                 prefill: {
-                    name: orderData.user_name || "",
+                    name:  orderData.user_name  || "",
                     email: orderData.user_email || "",
                 },
                 theme: { color: "#4f46e5" },
@@ -174,86 +188,107 @@ const SubscriptionModal = () => {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto relative">
 
-                {/* Close button — only shows if user has active access */}
-                {(isSubscribed || isOnTrial) && (
+                {/* Close — only if user has access */}
+                {canClose && (
                     <button
                         onClick={closeModal}
-                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition"
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition z-10"
                     >
                         <X size={22} />
                     </button>
                 )}
 
                 {/* Header */}
-                <div className="text-center p-8 pb-4">
+                <div className="text-center px-8 pt-8 pb-4">
                     <h1 className="text-3xl font-bold text-slate-900">SmartBill Plans</h1>
-                    <p className="text-slate-500 mt-2">
-                        Start free, upgrade anytime. Cancel anytime.
+                    <p className="text-slate-500 mt-2 text-sm">
+                        Start free — all features unlocked during trial. Upgrade anytime.
                     </p>
 
-                    {/* Status banner */}
+                    {/* Status banners */}
                     {isOnTrial && (
                         <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold border border-blue-200">
                             <Clock className="w-4 h-4" />
                             Free trial active — {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
                         </div>
                     )}
-                    {isExpired && !isOnTrial && trialUsed && (
-                        <div className="mt-4 inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-full text-sm font-semibold border border-red-200">
-                            Your subscription has expired. Renew to continue.
-                        </div>
-                    )}
                     {isSubscribed && (
                         <div className="mt-4 inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-semibold border border-green-200">
                             <ShieldCheck className="w-4 h-4" />
-                            Pro plan active — {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
+                            Pro active — {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
+                        </div>
+                    )}
+                    {isExpired && trialUsed && (
+                        <div className="mt-4 inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-full text-sm font-semibold border border-red-200">
+                            ⚠ Subscription expired — renew to continue
                         </div>
                     )}
                 </div>
 
-                {/* Plans */}
+                {/* Current validity — shown when active */}
+                {(isSubscribed || isOnTrial) && validUntil && (
+                    <div className="px-8 pb-2">
+                        <ValidityBadge
+                            label={isOnTrial ? "Trial Validity" : "Current Plan Validity"}
+                            date={validUntil}
+                            daysRemaining={daysRemaining}
+                            color={isOnTrial
+                                ? "bg-blue-50 border-blue-200 text-blue-800"
+                                : "bg-green-50 border-green-200 text-green-800"
+                            }
+                        />
+                        {isSubscribed && (
+                            <p className="text-xs text-slate-400 text-center mt-1">
+                                Paying again will extend your plan by 30 more days from current expiry
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/* Plan cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 pt-4">
 
                     {/* ── FREE TRIAL CARD ── */}
                     <div className="border-2 border-gray-200 rounded-2xl p-6 bg-gray-50">
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-gray-200 rounded-xl">
-                                <Star className="w-6 h-6 text-gray-600" />
+                            <div className="p-2 bg-amber-100 rounded-xl">
+                                <Star className="w-6 h-6 text-amber-500" />
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Free Trial</h3>
-                                <p className="text-sm text-gray-500">30 days, no card needed</p>
+                                <p className="text-sm text-gray-500">30 days · No card needed</p>
                             </div>
                         </div>
 
-                        <div className="mb-6">
+                        <div className="mb-4">
                             <span className="text-4xl font-extrabold text-gray-900">₹0</span>
                             <span className="text-gray-500 text-sm ml-2">for 30 days</span>
                         </div>
 
+                        {/* ✅ Trial unlocks EVERYTHING */}
+                        <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                            <Zap className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <p className="text-xs font-bold text-amber-700">
+                                All features unlocked during trial — nothing held back
+                            </p>
+                        </div>
+
                         <ul className="space-y-2 mb-8">
                             {ALL_FEATURES.map((f) => (
-                                <Feature
-                                    key={f}
-                                    text={f}
-                                    included={FREE_FEATURES.includes(f)}
-                                />
+                                <Feature key={f} text={f} included={true} />
                             ))}
                         </ul>
 
                         <button
                             onClick={handleStartTrial}
-                            disabled={trialUsed || isProcessing || isSubscribed}
-                            className="w-full py-3 rounded-xl font-bold text-white transition disabled:cursor-not-allowed
-                bg-gray-700 hover:bg-gray-800 disabled:bg-gray-300"
+                            disabled={trialUsed || isProcessing}
+                            className="w-full py-3 rounded-xl font-bold text-white transition disabled:cursor-not-allowed bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300"
                         >
                             {isProcessing
                                 ? "Starting..."
                                 : trialUsed
                                     ? "Trial Already Used"
-                                    : isSubscribed
-                                        ? "Subscribed"
-                                        : "Start Free Trial"}
+                                    : "Start Free Trial"}
                         </button>
                     </div>
 
@@ -267,8 +302,7 @@ const SubscriptionModal = () => {
 
                         {isSubscribed && (
                             <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1">
-                                <ShieldCheck className="w-3 h-3" />
-                                Active
+                                <ShieldCheck className="w-3 h-3" /> Active
                             </div>
                         )}
 
@@ -278,26 +312,38 @@ const SubscriptionModal = () => {
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Pro</h3>
-                                <p className="text-sm text-indigo-600 font-medium">All features included</p>
+                                <p className="text-sm text-indigo-600 font-medium">All features · Priority support</p>
                             </div>
                         </div>
 
-                        <div className="mb-6">
+                        <div className="mb-4">
                             <span className="text-4xl font-extrabold text-gray-900">₹300</span>
                             <span className="text-gray-500 text-sm ml-2">/ month</span>
                         </div>
 
+                        {/* Show what extension will look like */}
+                        {isSubscribed && validUntil && (
+                            <div className="mb-4 bg-indigo-100 border border-indigo-200 rounded-xl px-3 py-2">
+                                <p className="text-xs font-bold text-indigo-700">
+                                    ➕ Pay now → extends to{" "}
+                                    {new Date(
+                                        new Date(validUntil).getTime() + 30 * 24 * 60 * 60 * 1000
+                                    ).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                                </p>
+                            </div>
+                        )}
+
                         <ul className="space-y-2 mb-8">
                             {ALL_FEATURES.map((f) => (
-                                <Feature key={f} text={f} included={true} />
+                                <Feature key={f} text={f} included={!PRO_EXCLUDED.includes(f)} />
                             ))}
                         </ul>
 
+                        {/* ✅ Never disabled — always allow payment */}
                         <button
                             onClick={handleSubscribe}
-                            disabled={isSubscribed || isProcessing}
-                            className="w-full py-3 rounded-xl font-bold text-white transition disabled:cursor-not-allowed
-                bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 shadow-lg shadow-indigo-200"
+                            disabled={isProcessing}
+                            className="w-full py-3 rounded-xl font-bold text-white transition disabled:cursor-not-allowed bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 shadow-lg shadow-indigo-200"
                         >
                             {isProcessing ? (
                                 <span className="flex items-center justify-center gap-2">
@@ -305,7 +351,7 @@ const SubscriptionModal = () => {
                                     Processing...
                                 </span>
                             ) : isSubscribed ? (
-                                "Current Plan"
+                                "Extend by 30 Days — ₹300"
                             ) : (
                                 "Subscribe Now — ₹300/month"
                             )}
@@ -314,7 +360,7 @@ const SubscriptionModal = () => {
                 </div>
 
                 <p className="text-center text-xs text-gray-400 pb-6">
-                    Payments secured by Razorpay. Cancel anytime by not renewing.
+                    Payments secured by Razorpay · No auto-renewal · Manual renewal only
                 </p>
             </div>
         </div>
