@@ -126,7 +126,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = (
             "id", "shop", "customer", "customer_detail", "customer_name", "customer_mobile",
-            "created_at", "subtotal", "tax_total", "grand_total", "status", "items",
+            "created_at", "subtotal", "tax_total", "discount_total", "grand_total", "status", "items",
             "invoice_date", "number", "payment_mode"
         )
         read_only_fields = (
@@ -191,10 +191,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 tax_rate=tax, line_total=line_total + line_tax
             )
 
-        # 5. Save Final Totals
+        # 5. Save Final Totals — apply discount sent from frontend
+        discount = validated_data.get('discount_total', 0) or 0
         invoice.subtotal = total_calc
         invoice.tax_total = tax_calc
-        invoice.grand_total = total_calc + tax_calc
+        invoice.discount_total = discount
+        invoice.grand_total = total_calc + tax_calc - float(discount)
         invoice.total_amount = invoice.grand_total
         invoice.save()
 

@@ -259,10 +259,24 @@ const buildA4Doc = (invoice, shop) => {
   doc.text(`Rs. ${Number(invoice.grand_total).toFixed(2)}`, rightCol, fy, { align: "right" });
 
   // Footer
-  doc.setFontSize(9);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 120, 120);
+
+  const terms = shop?.config?.invoice?.terms || "";
+  let footerY = fy + 15;
+  if (terms) {
+    const termLines = doc.splitTextToSize(`Terms & Conditions: ${terms}`, pageW - margin * 2);
+    termLines.forEach((line) => {
+      doc.text(line, pageW / 2, footerY, { align: "center" });
+      footerY += 5;
+    });
+    footerY += 3;
+  }
+
   doc.setFont("helvetica", "italic");
   doc.setTextColor(160, 160, 160);
-  doc.text("Thank you for your business!", pageW / 2, 280, { align: "center" });
+  doc.text("Thank you for your business!", pageW / 2, footerY, { align: "center" });
 
   return doc;
 };

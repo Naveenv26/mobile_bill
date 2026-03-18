@@ -126,11 +126,25 @@ export const generateThermalPDF = (printData, currentShop) => {
     doc.text(`Rs. ${total.toFixed(2)}`, rx, finalY, { align: "right" });
 
     // Footer
-    finalY += 9;
+    finalY += 10;
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(120, 120, 120);
+
+    // Terms & Conditions — print before thank you if present
+    const terms = currentShop?.config?.invoice?.terms || "";
+    if (terms) {
+        const termLines = doc.splitTextToSize(`T&C: ${terms}`, pageW - 8);
+        doc.setTextColor(100, 100, 100);
+        termLines.forEach((line) => {
+            doc.text(line, pageW / 2, finalY, { align: "center" });
+            finalY += 4;
+        });
+        doc.setTextColor(0, 0, 0);
+        finalY += 2;
+    }
+
     doc.text("Thank you for your visit!", pageW / 2, finalY, { align: "center" });
+
 
     finalY += 5;
     // Dashed cut line
