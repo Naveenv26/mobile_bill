@@ -117,7 +117,7 @@ export default function Login() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            Smart<span className="text-indigo-600">Bill</span>
+            <img src="/sparkbill-logo.png" alt="SparkBill" className="h-10 w-auto object-contain mx-auto" />
           </h1>
           <p className="text-sm text-slate-500 mt-2 font-medium">
             {view === "login" && "Login to manage your shop"}

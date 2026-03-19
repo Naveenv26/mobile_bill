@@ -177,9 +177,11 @@ export default function Layout({ children }) {
                 
                 <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between shrink-0 z-20 mt-[0.5cm] lg:mt-0">
                     <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                            SmartBill
-                        </h2>
+                        <img
+                        src="/sparkbill-logo.png"
+                        alt="SparkBill"
+                        className="h-7 w-auto object-contain"
+                    />
                         {getSubscriptionStatusButton()}
                     </div>
 

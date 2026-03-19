@@ -138,7 +138,7 @@ const SubscriptionModal = () => {
                 key:         orderData.key,
                 amount:      orderData.amount,
                 currency:    orderData.currency,
-                name:        "SmartBill",
+                name:        "SparkBill",
                 description: extendMsg,
                 order_id:    orderData.order_id,
                 handler: async (response) => {
@@ -200,7 +200,10 @@ const SubscriptionModal = () => {
 
                 {/* Header */}
                 <div className="text-center px-8 pt-8 pb-4">
-                    <h1 className="text-3xl font-bold text-slate-900">SmartBill Plans</h1>
+                    <div className="flex justify-center mb-2">
+    <img src="/sparkbill-logo.png" alt="SparkBill" className="h-10 w-auto object-contain" />
+</div>
+<h1 className="text-3xl font-bold text-slate-900">SparkBill Plans</h1>
                     <p className="text-slate-500 mt-2 text-sm">
                         Start free — all features unlocked during trial. Upgrade anytime.
                     </p>
