@@ -191,14 +191,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 tax_rate=tax, line_total=line_total + line_tax
             )
 
-        # 5. Save Final Totals — apply discount sent from frontend
-        discount = validated_data.get('discount_total', 0) or 0
-        invoice.subtotal = total_calc
-        invoice.tax_total = tax_calc
-        invoice.discount_total = discount
-        invoice.grand_total = total_calc + tax_calc - float(discount)
-        invoice.total_amount = invoice.grand_total
-        invoice.save()
+    # 5. Save Final Totals — apply discount sent from frontend
+            discount = validated_data.get('discount_total', 0) or 0
+            invoice.subtotal = total_calc
+            invoice.tax_total = tax_calc
+            invoice.discount_total = discount
+            invoice.grand_total = total_calc + tax_calc - float(discount)
+            invoice.save()
 
         return invoice
 
