@@ -337,8 +337,8 @@ export default function Billing() {
           </button>
         </div>
 
-        <div className="px-4 pb-2 mx-auto">
-            <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+        <div className="px-4 pb-2">
+          <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-full">
             <input
               ref={nameRef}
               type="text"
@@ -375,7 +375,7 @@ export default function Billing() {
       </div>
 
       {/* ── Product Grid ── */}
-      <div className="p-3 max-w-7xl mx-auto">
+      <div className="px-4 py-3 max-w-7xl mx-auto">
         {filteredProducts.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-slate-400 text-sm">
             No products found
