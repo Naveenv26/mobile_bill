@@ -326,7 +326,7 @@ export default function Billing() {
     <div className="bg-slate-50 min-h-screen pb-44 font-sans text-slate-800">
 
       {/* ── Sticky Header ── */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm mt-[2px] lg:mt-0">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm mt-[6px] lg:mt-0">
         <div className="px-4 py-3 flex justify-between items-center">
           <h1 className="font-extrabold text-slate-800 text-xl tracking-tight">New Sale</h1>
           <button
@@ -337,8 +337,8 @@ export default function Billing() {
           </button>
         </div>
 
-        <div className="px-4 pb-2">
-          <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+        <div className="px-4 pb-2 mx-auto">
+            <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             <input
               ref={nameRef}
               type="text"
