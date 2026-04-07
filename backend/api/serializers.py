@@ -121,12 +121,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(allow_blank=True, required=False, write_only=True)
     customer_mobile = serializers.CharField(allow_blank=True, required=False, write_only=True)
     customer_detail = CustomerSerializer(source="customer", read_only=True)
-
+    discount_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0)
     class Meta:
         model = Invoice
         fields = (
             "id", "shop", "customer", "customer_detail", "customer_name", "customer_mobile",
-            "created_at", "subtotal", "tax_total", "grand_total", "status", "items",
+            "created_at", "subtotal", "tax_total", "grand_total","discount_total", "status", "items",
             "invoice_date", "number", "payment_mode"
         )
         read_only_fields = (
@@ -138,7 +138,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         request = self.context.get('request')
-        
+        discount_amount = validated_data.get("discount_total", 0)
         shop = Shop.objects.select_for_update().get(id=request.user.shop.id)
 
         # 1. Generate Invoice Number
@@ -167,7 +167,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             number=formatted_number,
             payment_mode=validated_data.get('payment_mode', 'cash'),
             created_by=request.user,
-            grand_total=0 
+            discount_total=discount_amount, # Save the discount
+            grand_total=0
         )
 
         # 4. Calculate Totals from Items
@@ -195,7 +196,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             # 5. Save Final Totals
         invoice.subtotal = total_calc
         invoice.tax_total = tax_calc
-        invoice.grand_total = total_calc + tax_calc
+        invoice.grand_total = (total_calc + tax_calc) - discount_amount
         invoice.save()
 
         return invoice
