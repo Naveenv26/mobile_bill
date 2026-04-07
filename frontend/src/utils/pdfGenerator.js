@@ -102,6 +102,7 @@ export const generateThermalPDF = async (printData, currentShop) => {
     // ── PASS 2: render ────────────────────────────────────────────────────
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, fy] });
     let cur = 4;
+    
 
     // Logo (top-left)
     if (logoData && logoW > 0) {

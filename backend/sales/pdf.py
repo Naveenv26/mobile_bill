@@ -3,6 +3,8 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image # Update imports
+import os
 
 def generate_invoice_pdf(invoice):
     buffer = BytesIO()
@@ -12,6 +14,15 @@ def generate_invoice_pdf(invoice):
 
     # Shop Info
     shop = invoice.shop
+    if shop.logo:
+        try:
+            # Adjust width and height to fit the header
+            logo = Image(shop.logo.path, width=60, height=60)
+            logo.hAlign = 'LEFT'
+            elements.append(logo)
+            elements.append(Spacer(1, 6))
+        except Exception:
+            pass
     elements.append(Paragraph(f"<b>{shop.name}</b>", styles['Title']))
     elements.append(Paragraph(shop.address, styles['Normal']))
     elements.append(Paragraph(f"Phone: {shop.contact_phone}", styles['Normal']))
