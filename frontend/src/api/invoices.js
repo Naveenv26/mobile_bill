@@ -17,6 +17,9 @@ export const createInvoice = async (data) => {
       unit_price: c.unit_price,
       tax_rate: c.tax_rate,
     })),
+    subtotal: data.subtotal || 0,
+    tax_total: data.tax_total || 0,
+    discount_total: data.discount_total || 0,
     grand_total: data.grand_total,
   };
   const res = await client.post("/invoices/", payload);

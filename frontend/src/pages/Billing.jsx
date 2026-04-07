@@ -175,20 +175,30 @@ export default function Billing() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
 
+    // Logo — top left if available
+    const logoSrc = currentShop?.config?.logo || currentShop?.logo || null;
+    let headerStartY = 20;
+    if (logoSrc) {
+      try {
+        doc.addImage(logoSrc, "PNG", margin, 8, 30, 20);
+        headerStartY = 32;
+      } catch { /* skip logo silently */ }
+    }
+
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(40, 40, 40);
-    doc.text("INVOICE", pageWidth - margin, 20, { align: "right" });
+    doc.text("INVOICE", pageWidth - margin, headerStartY, { align: "right" });
 
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
-    doc.text(currentShop.name || "Shop Name", margin, 20);
+    doc.text(currentShop.name || "Shop Name", margin, headerStartY);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
 
-    let addrY = 28;
+    let addrY = headerStartY + 8;
     const usableW = pageWidth / 2 - margin - 10;
     if (currentShop.address) {
       const addrLines = doc.splitTextToSize(currentShop.address, usableW);
@@ -197,7 +207,7 @@ export default function Billing() {
     if (currentShop.contact_phone) { doc.text(`Phone: ${currentShop.contact_phone}`, margin, addrY); addrY += 5; }
     if (currentShop.contact_email) { doc.text(currentShop.contact_email, margin, addrY); addrY += 5; }
 
-    const lineY = Math.max(addrY + 2, 38);
+    const lineY = Math.max(addrY + 2, headerStartY + 18);
     doc.setDrawColor(200, 200, 200);
     doc.line(margin, lineY, pageWidth - margin, lineY);
 
@@ -252,13 +262,16 @@ export default function Billing() {
     doc.text("Grand Total:", rightAlign - 40, finalY, { align: "right" });
     doc.text(`Rs. ${Number(printData.grand_total).toFixed(2)}`, rightAlign, finalY, { align: "right" });
 
+    // Footer — always below content, not hardcoded
+    finalY += 16;
     doc.setFontSize(9);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(150, 150, 150);
-    doc.text("Thank you for your business!", pageWidth / 2, 280, { align: "center" });
+    doc.text("Thank you for your business!", pageWidth / 2, finalY, { align: "center" });
   };
 
-  const generatePDFBlob = (dataToPrint) => {
+
+  const generatePDFBlob = async (dataToPrint) => {
     const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
     const isA4 = paperSize === "A4";
     if (isA4) {
@@ -266,7 +279,7 @@ export default function Billing() {
       generateA4PDF(doc, dataToPrint || invoiceData);
       return doc.output("blob");
     } else {
-      const doc = generateThermalPDF(dataToPrint || invoiceData, currentShop);
+      const doc = await generateThermalPDF(dataToPrint || invoiceData, currentShop);
       return doc.output("blob");
     }
   };
@@ -277,7 +290,7 @@ export default function Billing() {
   const handleShare = async () => {
     setIsGeneratingPDF(true);
     try {
-      const blob = generatePDFBlob(invoiceData);
+      const blob = await generatePDFBlob(invoiceData);
       await sharePdfNative(blob, invoiceFilename, {
         title: `Bill from ${currentShop.name}`,
         text: `Hello ${invoiceData?.customer_name}, here is your invoice.`,
@@ -296,7 +309,7 @@ export default function Billing() {
   const handleDownload = async () => {
     setIsGeneratingPDF(true);
     try {
-      const blob = generatePDFBlob(invoiceData);
+      const blob = await generatePDFBlob(invoiceData);
       await downloadPdfNative(blob, invoiceFilename);
       if (onAndroid) toast.success("Saved to Downloads!");
     } catch (err) {
