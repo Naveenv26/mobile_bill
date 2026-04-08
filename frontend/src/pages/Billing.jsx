@@ -175,46 +175,57 @@ export default function Billing() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
 
-    // Logo — top right, square, directly above INVOICE text
-    const logoSrc = currentShop?.config?.logo_base64 || null;
-    let headerStartY = 28; // Default lowered position for INVOICE
+    const startY = 15;
+    let leftY = startY;
 
-    if (logoSrc) {
-      try {
-        const logoSize = 22; // 1:1 perfect square
-        // Position on top right
-        doc.addImage(logoSrc, "PNG", pageWidth - margin - logoSize, 12, logoSize, logoSize);
-        // Push the INVOICE text down below the logo
-        headerStartY = 12 + logoSize + 8; // e.g., Y = 42
-      } catch { /* skip logo silently */ }
-    }
-
-    doc.setFontSize(20);
+    // 1. Draw Left Side (Shop Details with Labels)
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(40, 40, 40);
-    doc.text("INVOICE", pageWidth - margin, headerStartY, { align: "right" });    doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
-    doc.text(currentShop.name || "Shop Name", margin, headerStartY);
+    doc.text(currentShop.name || "Shop Name", margin, leftY);
+    leftY += 7;
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
+    const usableW = pageWidth / 2 - margin - 20;
 
-    let addrY = headerStartY + 8;
-    const usableW = pageWidth / 2 - margin - 10;
     if (currentShop.address) {
-      const addrLines = doc.splitTextToSize(currentShop.address, usableW);
-      addrLines.forEach((line) => { doc.text(line, margin, addrY); addrY += 5; });
+      const addrLines = doc.splitTextToSize(`Address: ${currentShop.address}`, usableW);
+      addrLines.forEach((line) => { doc.text(line, margin, leftY); leftY += 5; });
     }
-    if (currentShop.contact_phone) { doc.text(`Phone: ${currentShop.contact_phone}`, margin, addrY); addrY += 5; }
-    if (currentShop.contact_email) { doc.text(currentShop.contact_email, margin, addrY); addrY += 5; }
-    if (currentShop.gstin) { doc.text(`GSTIN: ${currentShop.gstin}`, margin, addrY); addrY += 5; }
+    if (currentShop.contact_phone) { doc.text(`Mob. No: ${currentShop.contact_phone}`, margin, leftY); leftY += 5; }
+    if (currentShop.contact_email) { doc.text(`Email: ${currentShop.contact_email}`, margin, leftY); leftY += 5; }
+    if (currentShop.gstin) { doc.text(`GSTIN: ${currentShop.gstin}`, margin, leftY); leftY += 5; }
 
-    const lineY = Math.max(addrY + 2, headerStartY + 18);
+    // Calculate total height of the left block
+    const leftHeight = leftY - startY - 5; 
+
+    // 2. Draw Logo on Right (Height strictly matches left side)
+    const logoSrc = currentShop?.config?.logo_base64 || null;
+    let rightY = startY;
+    if (logoSrc) {
+      try {
+        const logoSize = leftHeight > 15 ? leftHeight : 22; // 1:1 Square matching text height
+        doc.addImage(logoSrc, "PNG", pageWidth - margin - logoSize, rightY, logoSize, logoSize);
+        rightY += logoSize + 8;
+      } catch { /* skip */ }
+    } else {
+      rightY += 10;
+    }
+
+    // 3. Draw INVOICE below logo
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text("INVOICE", pageWidth - margin, rightY, { align: "right" });
+
+    // Divider Line
+    const lineY = Math.max(leftY + 2, rightY + 6);
     doc.setDrawColor(200, 200, 200);
     doc.line(margin, lineY, pageWidth - margin, lineY);
-
-    const startY = lineY + 12;
+    
+    
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
     doc.text("Bill To:", margin, startY);

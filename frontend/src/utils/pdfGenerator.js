@@ -34,20 +34,19 @@ export const generateThermalPDF = async (printData, currentShop) => {
     const measure = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 297] });
     measure.setFontSize(7);
 
-    let fy = 8;
-    if (logoData && logoH > 0) {
-        fy += Math.max(5, logoH); // Ensure enough space if logo is taller than text
-    } else {
-        fy += 5;
-    }  // shop name
+    let fy = 8; 
+    fy += 5; // Shop name
     if (currentShop?.address) {
-        const lines = measure.splitTextToSize(currentShop.address, pageW - lx - 4);
+        const lines = measure.splitTextToSize(`Address: ${currentShop.address}`, pageW - lx - 30);
         fy += lines.length * 4;
     }
     if (currentShop?.contact_phone) fy += 4;
     if (currentShop?.contact_email) fy += 4;
     if (currentShop?.gstin) fy += 4;
-    fy += 6;  // divider
+    
+    // Add extra buffer for logo if it ends up being taller than the text block
+    fy += 10; 
+    fy += 6;  // divider  // divider
     fy += 10;  // customer rows
 
     autoTable(measure, {
@@ -72,33 +71,41 @@ export const generateThermalPDF = async (printData, currentShop) => {
 
    // ── PASS 2: render ──────────────────────────────────────────────────
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, fy] });
-    let cur = 8; // Start slightly lower
+    
+    let cur = 8; 
+    const startY = cur; // Track where the text block begins
 
-    // Shop name — bold, LEFT
+    // 1. Draw Left Text Block
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text(currentShop?.name || "Shop", lx, cur);
+    cur += 5;
 
-    // Logo - Top Right, parallel to Shop Name
-    if (logoData && logoW > 0 && logoH > 0) {
-        // doc.text draws from bottom-left of text baseline, doc.addImage draws from top-left.
-        // Subtracting 3.5mm from 'cur' aligns the logo top nicely with the text top.
-        doc.addImage(logoData, "PNG", rx - logoW, cur - 3.5, logoW, logoH);
-        cur += Math.max(5, logoH - 1); // Advance cursor below the tallest element
-    } else {
-        cur += 5;
-    }
-
-    // Address / phone / email — LEFT
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     if (currentShop?.address) {
-        const addrLines = doc.splitTextToSize(currentShop.address, pageW - lx - 4);
+        // Constrain width to 'pageW - lx - 30' so long addresses don't print over the logo
+        const addrLines = doc.splitTextToSize(`Address: ${currentShop.address}`, pageW - lx - 30);
         addrLines.forEach((line) => { doc.text(line, lx, cur); cur += 4; });
     }
-    if (currentShop?.contact_phone) { doc.text(`Phone: ${currentShop.contact_phone}`, lx, cur); cur += 4; }
-    if (currentShop?.contact_email) { doc.text(currentShop.contact_email, lx, cur); cur += 4; }
+    if (currentShop?.contact_phone) { doc.text(`Mob. No: ${currentShop.contact_phone}`, lx, cur); cur += 4; }
+    if (currentShop?.contact_email) { doc.text(`Email: ${currentShop.contact_email}`, lx, cur); cur += 4; }
     if (currentShop?.gstin) { doc.text(`GSTIN: ${currentShop.gstin}`, lx, cur); cur += 4; }
+
+    const textHeight = cur - startY - 4; // Exact height of the text block
+
+    // 2. Draw Logo on Right (Matching text block height)
+    if (logoData) {
+        // Cap the max size at 26mm so it doesn't take over the whole receipt width
+        const logoSize = Math.min(Math.max(16, textHeight), 26);
+        // We subtract 3.5 from startY so the top of the image aligns with the top of the Shop Name text
+        doc.addImage(logoData, "PNG", rx - logoSize, startY - 3.5, logoSize, logoSize);
+        
+        // Ensure cursor is below whichever is taller: the text or the logo
+        if ((startY - 3.5 + logoSize) > cur) {
+            cur = startY - 3.5 + logoSize + 4;
+        }
+    }
 
     // Divider
     doc.setDrawColor(180, 180, 180);
