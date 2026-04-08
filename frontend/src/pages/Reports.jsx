@@ -1,7 +1,7 @@
 // frontend/src/pages/Reports.jsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { getInvoices } from "../api/invoices.js";
-import { getProducts } from "../api/products.js";
+import { fetchAllInvoices } from "../api/invoices.js";
+import { fetchAllProducts } from "../api/products.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
 import { utils, writeFileXLSX } from "xlsx";
 import InvoiceModal from "../components/InvoiceModal.jsx";
@@ -53,7 +53,7 @@ export default function Reports() {
         const loadData = async () => {
             setLoading(true);
             try {
-                const [inv, prod] = await Promise.all([getInvoices(), getProducts()]);
+                const [inv, prod] = await Promise.all([fetchAllInvoices(), fetchAllProducts()]);
                 setInvoices(inv);
                 setProducts(prod);
             } catch (e) { console.error(e); }
@@ -85,8 +85,8 @@ export default function Reports() {
     }, [tab]);
 
     const filteredData = useMemo(() => {
-        const start = fromDate ? new Date(fromDate) : null;
-        const end   = toDate   ? new Date(toDate + "T23:59:59.999Z") : null;
+        const start = fromDate ? new Date(fromDate + "T00:00:00") : null;
+        const end   = toDate   ? new Date(toDate   + "T23:59:59") : null;
         const q     = search.toLowerCase();
         const filteredInvoices = invoices.filter((inv) => {
             if (!inv.invoice_date) return false;

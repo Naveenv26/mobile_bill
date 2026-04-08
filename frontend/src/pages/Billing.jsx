@@ -1,6 +1,6 @@
 // frontend/src/pages/Billing.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { getProducts } from "../api/products.js";
+import { fetchAllProducts } from "../api/products.js";
 import { createInvoice } from "../api/invoices.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
 import toast from "react-hot-toast";
@@ -84,7 +84,7 @@ export default function Billing() {
 
   const loadProducts = async () => {
     try {
-      const data = await getProducts();
+      const data = await fetchAllProducts();
       const normalized = data.map((p) => ({
         id: p.id,
         name: p.name,
