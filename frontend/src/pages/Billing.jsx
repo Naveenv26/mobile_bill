@@ -175,23 +175,24 @@ export default function Billing() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
 
-    // Logo — top left if available
-    const logoSrc = currentShop?.config?.logo || currentShop?.logo || null;
-    let headerStartY = 20;
+    // Logo — top right, square, directly above INVOICE text
+    const logoSrc = currentShop?.config?.logo_base64 || null;
+    let headerStartY = 28; // Default lowered position for INVOICE
+
     if (logoSrc) {
       try {
-        // Changed 'margin' to 'pageWidth - margin - 30' to align right
-        doc.addImage(logoSrc, "PNG", pageWidth - margin - 30, 8, 30, 20);
-        headerStartY = 32;
+        const logoSize = 22; // 1:1 perfect square
+        // Position on top right
+        doc.addImage(logoSrc, "PNG", pageWidth - margin - logoSize, 12, logoSize, logoSize);
+        // Push the INVOICE text down below the logo
+        headerStartY = 12 + logoSize + 8; // e.g., Y = 42
       } catch { /* skip logo silently */ }
     }
 
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(40, 40, 40);
-    doc.text("INVOICE", pageWidth - margin, headerStartY, { align: "right" });
-
-    doc.setFontSize(18);
+    doc.text("INVOICE", pageWidth - margin, headerStartY, { align: "right" });    doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     doc.text(currentShop.name || "Shop Name", margin, headerStartY);
 
@@ -207,6 +208,7 @@ export default function Billing() {
     }
     if (currentShop.contact_phone) { doc.text(`Phone: ${currentShop.contact_phone}`, margin, addrY); addrY += 5; }
     if (currentShop.contact_email) { doc.text(currentShop.contact_email, margin, addrY); addrY += 5; }
+    if (currentShop.gstin) { doc.text(`GSTIN: ${currentShop.gstin}`, margin, addrY); addrY += 5; }
 
     const lineY = Math.max(addrY + 2, headerStartY + 18);
     doc.setDrawColor(200, 200, 200);

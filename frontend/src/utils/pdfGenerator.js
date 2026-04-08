@@ -1,28 +1,19 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { getLogoBase64 } from "../pages/settings/ProfileSettings";
 
 export const generateThermalPDF = async (printData, currentShop) => {
     const pageW = 80;
     const lx    = 4;
     const rx    = 76;
 
-    // ── Logo — read from cache (url stored in config.logo_url) ───────────
-    const shopId   = currentShop?.id;
-    const logoUrl  = currentShop?.config?.logo_url || "";
-    const logoData = await getLogoBase64(shopId, logoUrl);
+    // ── Logo — read from local config ───────────
+    const logoData = currentShop?.config?.logo_base64 || null;
 
-    const LOGO_MAX_W = 16;
-    const LOGO_MAX_H = 16;
+    const LOGO_SIZE = 16; // 1:1 Perfect Square
     let logoW = 0, logoH = 0;
     if (logoData) {
-        const img = new Image();
-        img.src = logoData;
-        await new Promise((r) => { img.onload = r; img.onerror = r; });
-        const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1);
-        logoW = Math.min(LOGO_MAX_W, LOGO_MAX_H * ratio);
-        logoH = logoW / ratio;
-        if (logoH > LOGO_MAX_H) { logoH = LOGO_MAX_H; logoW = logoH * ratio; }
+        logoW = LOGO_SIZE;
+        logoH = LOGO_SIZE;
     }
 
     const tableRows = (printData.items || []).map((item) => {
@@ -43,16 +34,20 @@ export const generateThermalPDF = async (printData, currentShop) => {
     const measure = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 297] });
     measure.setFontSize(7);
 
-    let fy = 4;
-    if (logoData && logoH > 0) fy += logoH + 3;
-    fy += 5;  // shop name
+    let fy = 8;
+    if (logoData && logoH > 0) {
+        fy += Math.max(5, logoH); // Ensure enough space if logo is taller than text
+    } else {
+        fy += 5;
+    }  // shop name
     if (currentShop?.address) {
         const lines = measure.splitTextToSize(currentShop.address, pageW - lx - 4);
         fy += lines.length * 4;
     }
     if (currentShop?.contact_phone) fy += 4;
     if (currentShop?.contact_email) fy += 4;
-    fy += 6;   // divider
+    if (currentShop?.gstin) fy += 4;
+    fy += 6;  // divider
     fy += 10;  // customer rows
 
     autoTable(measure, {
@@ -75,21 +70,24 @@ export const generateThermalPDF = async (printData, currentShop) => {
     }
     fy += 5 + 6; // thank you + cut line
 
-    // ── PASS 2: render ──────────────────────────────────────────────────
+   // ── PASS 2: render ──────────────────────────────────────────────────
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, fy] });
-    let cur = 4;
-
-    // Logo
-    if (logoData && logoW > 0 && logoH > 0) {
-        doc.addImage(logoData, "PNG", rx - logoW, cur, logoW, logoH);
-        cur += logoH + 3;
-    }
+    let cur = 8; // Start slightly lower
 
     // Shop name — bold, LEFT
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text(currentShop?.name || "Shop", lx, cur);
-    cur += 5;
+
+    // Logo - Top Right, parallel to Shop Name
+    if (logoData && logoW > 0 && logoH > 0) {
+        // doc.text draws from bottom-left of text baseline, doc.addImage draws from top-left.
+        // Subtracting 3.5mm from 'cur' aligns the logo top nicely with the text top.
+        doc.addImage(logoData, "PNG", rx - logoW, cur - 3.5, logoW, logoH);
+        cur += Math.max(5, logoH - 1); // Advance cursor below the tallest element
+    } else {
+        cur += 5;
+    }
 
     // Address / phone / email — LEFT
     doc.setFontSize(7);
@@ -100,6 +98,7 @@ export const generateThermalPDF = async (printData, currentShop) => {
     }
     if (currentShop?.contact_phone) { doc.text(`Phone: ${currentShop.contact_phone}`, lx, cur); cur += 4; }
     if (currentShop?.contact_email) { doc.text(currentShop.contact_email, lx, cur); cur += 4; }
+    if (currentShop?.gstin) { doc.text(`GSTIN: ${currentShop.gstin}`, lx, cur); cur += 4; }
 
     // Divider
     doc.setDrawColor(180, 180, 180);

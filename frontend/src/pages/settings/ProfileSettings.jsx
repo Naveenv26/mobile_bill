@@ -1,105 +1,60 @@
 // frontend/src/pages/settings/ProfileSettings.jsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import axios, { getErrorMessage } from "../../api/axios";
 import { toast } from "react-hot-toast";
-
-// ── Logo cache key per shop ──────────────────────────────────────────────────
-const logoCacheKey = (shopId) => `logo_cache_${shopId}`;
-
-// ── Convert an image URL to base64 (for PDF use) and cache it ───────────────
-export const getLogoBase64 = async (shopId, logoUrl) => {
-  if (!logoUrl || !shopId) return null;
-
-  // Return from cache if available and url hasn't changed
-  try {
-    const cached = JSON.parse(localStorage.getItem(logoCacheKey(shopId)) || "null");
-    if (cached && cached.url === logoUrl) return cached.base64;
-  } catch { /* ignore */ }
-
-  // Fetch and convert
-  try {
-    const res = await fetch(logoUrl);
-    if (!res.ok) throw new Error("fetch failed");
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target.result;
-        try {
-          localStorage.setItem(logoCacheKey(shopId), JSON.stringify({ url: logoUrl, base64 }));
-        } catch { /* storage full — skip cache */ }
-        resolve(base64);
-      };
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-};
 
 export default function ProfileSettings({ shop }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm]       = useState({});
   const [loading, setLoading] = useState(false);
-  const [logoUrlInput, setLogoUrlInput] = useState("");
-  const [logoPreview, setLogoPreview]   = useState(null); // base64 or url for <img>
-  const [logoLoading, setLogoLoading]   = useState(false);
-  const debounceRef = useRef(null);
+  const [logoPreview, setLogoPreview] = useState(null);
 
   // ── Populate form when shop prop arrives ──
   useEffect(() => {
     if (shop) {
       setForm(shop);
-      const savedUrl = shop.config?.logo_url || "";
-      setLogoUrlInput(savedUrl);
-      // Set preview immediately from cache if available, else from url
-      if (savedUrl) {
-        try {
-          const cached = JSON.parse(localStorage.getItem(logoCacheKey(shop.id)) || "null");
-          if (cached && cached.url === savedUrl) {
-            setLogoPreview(cached.base64);
-          } else {
-            setLogoPreview(savedUrl); // show directly, browser handles CORS
-          }
-        } catch {
-          setLogoPreview(savedUrl);
-        }
-      }
+      setLogoPreview(shop.config?.logo_base64 || null);
     }
   }, [shop]);
 
-  // ── Debounce URL input → validate + cache on change ──
-  const handleLogoUrlChange = (e) => {
-    const url = e.target.value.trim();
-    setLogoUrlInput(url);
-    setLogoPreview(null);
+  // ── Read file, compress, and convert to base64 ──
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    clearTimeout(debounceRef.current);
-    if (!url) return;
-
-    debounceRef.current = setTimeout(async () => {
-      setLogoLoading(true);
-      try {
-        // Try to cache it (will work for direct image links)
-        const base64 = await getLogoBase64(shop?.id, url);
-        if (base64) {
-          setLogoPreview(base64);
-        } else {
-          // Fallback — show url directly (CORS-blocked but still visible in browser)
-          setLogoPreview(url);
-        }
-        // Store url in form config
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 300; 
+        const scale = Math.min(MAX_WIDTH / img.width, 1);
+        
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const compressedBase64 = canvas.toDataURL("image/png", 0.8);
+        
+        setLogoPreview(compressedBase64);
         setForm((prev) => ({
           ...prev,
-          config: { ...(prev.config || {}), logo_url: url },
+          config: { ...(prev.config || {}), logo_base64: compressedBase64 },
         }));
-      } catch {
-        toast.error("Could not load that image URL.");
-      } finally {
-        setLogoLoading(false);
-      }
-    }, 700);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoPreview(null);
+    setForm((prev) => ({
+      ...prev,
+      config: { ...(prev.config || {}), logo_base64: null },
+    }));
   };
 
   const handleChange = (e) => {
@@ -132,9 +87,7 @@ export default function ProfileSettings({ shop }) {
         {/* Logo preview */}
         <div className="relative flex-shrink-0">
           <div className="w-24 h-24 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
-            {logoLoading ? (
-              <div className="w-5 h-5 border-2 border-slate-300 border-t-sky-500 rounded-full animate-spin" />
-            ) : logoPreview ? (
+            {logoPreview ? (
               <img
                 src={logoPreview}
                 alt="Shop Logo"
@@ -167,49 +120,29 @@ export default function ProfileSettings({ shop }) {
         </div>
       </div>
 
-      {/* ── Logo URL section ── */}
+    {/* ── File Upload Section ── */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h3 className="text-lg font-bold text-slate-900 mb-1">Shop Logo</h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Paste a direct image URL (Google Drive, Imgur, etc.). The image is cached on your device — no storage used on the server.
-        </p>
+        <p className="text-xs text-slate-400 mb-4">Select an image from your device.</p>
 
-        <div className="flex gap-3 items-start">
-          <div className="flex-1">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Image URL</label>
-            <input
-              type="url"
-              placeholder="https://i.imgur.com/yourlogo.png"
-              value={logoUrlInput}
-              onChange={handleLogoUrlChange}
-              className="w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-400 text-slate-900 text-sm"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              Tip: For Google Drive — share the file publicly, then use{" "}
-              <span className="font-mono bg-slate-100 px-1 rounded">https://drive.google.com/uc?export=view&id=FILE_ID</span>
-            </p>
-          </div>
+        <div className="flex gap-4 items-start">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleLogoUpload}
+            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer"
+          />
 
           {logoPreview && (
-            <div className="mt-5 w-16 h-16 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex-shrink-0">
-              <img src={logoPreview} alt="Preview" className="w-full h-full object-contain p-1" onError={() => setLogoPreview(null)} />
+            <div className="w-16 h-16 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex-shrink-0">
+              <img src={logoPreview} alt="Preview" className="w-full h-full object-contain p-1" />
             </div>
           )}
         </div>
 
-        {logoUrlInput && (
+        {logoPreview && (
           <button
-            onClick={async () => {
-              setLogoUrlInput("");
-              setLogoPreview(null);
-              setForm((prev) => ({
-                ...prev,
-                config: { ...(prev.config || {}), logo_url: "" },
-              }));
-              // Clear cache for this shop
-              if (shop?.id) localStorage.removeItem(logoCacheKey(shop.id));
-              toast.success("Logo removed.");
-            }}
+            onClick={removeLogo}
             className="mt-3 text-xs text-red-500 hover:text-red-700 font-medium"
           >
             Remove logo
