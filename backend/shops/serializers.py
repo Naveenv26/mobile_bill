@@ -28,6 +28,8 @@ class ShopSerializer(serializers.ModelSerializer):
             'inventory',
             'notifications',
             'customer',
+            # logo — stored as a URL (no base64 in DB)
+            'logo_url',
             # flat keys (keep for backwards compat)
             'show_tax',
             'show_discount',
