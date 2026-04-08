@@ -81,7 +81,7 @@ export const generateThermalPDF = async (printData, currentShop) => {
 
     // Logo
     if (logoData && logoW > 0 && logoH > 0) {
-        doc.addImage(logoData, "PNG", lx, cur, logoW, logoH);
+        doc.addImage(logoData, "PNG", rx - logoW, cur, logoW, logoH);
         cur += logoH + 3;
     }
 

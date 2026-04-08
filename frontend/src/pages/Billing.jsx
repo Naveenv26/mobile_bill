@@ -180,7 +180,8 @@ export default function Billing() {
     let headerStartY = 20;
     if (logoSrc) {
       try {
-        doc.addImage(logoSrc, "PNG", margin, 8, 30, 20);
+        // Changed 'margin' to 'pageWidth - margin - 30' to align right
+        doc.addImage(logoSrc, "PNG", pageWidth - margin - 30, 8, 30, 20);
         headerStartY = 32;
       } catch { /* skip logo silently */ }
     }
