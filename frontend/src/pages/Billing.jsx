@@ -171,61 +171,48 @@ export default function Billing() {
   };
 
   // ── PDF builder ─────────────────────────────────────────────────────────
-  const generateA4PDF = (doc, printData) => {
+  // logoBase64 is pre-fetched by generatePDFBlob so this stays synchronous
+  const generateA4PDF = (doc, printData, logoBase64 = null) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
 
-    const startY = 15;
-    let leftY = startY;
+    // Logo — only use pre-fetched base64, never a raw URL
+    let headerStartY = 20;
+    if (logoBase64) {
+      try {
+        // Logo: top-left, 20mm tall, proportional width (max 40mm)
+        doc.addImage(logoBase64, "PNG", margin, 8, 30, 20);
+        headerStartY = 32;
+      } catch { /* skip logo if format unsupported */ }
+    }
 
-    // 1. Draw Left Side (Shop Details with Labels)
-    doc.setFontSize(18);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text("INVOICE", pageWidth - margin, headerStartY, { align: "right" });
+
+    doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
-    doc.text(currentShop.name || "Shop Name", margin, leftY);
-    leftY += 7;
+    doc.text(currentShop.name || "Shop Name", margin, headerStartY);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
-    const usableW = pageWidth / 2 - margin - 20;
 
+    let addrY = headerStartY + 8;
+    const usableW = pageWidth / 2 - margin - 10;
     if (currentShop.address) {
-      const addrLines = doc.splitTextToSize(`Address: ${currentShop.address}`, usableW);
-      addrLines.forEach((line) => { doc.text(line, margin, leftY); leftY += 5; });
+      const addrLines = doc.splitTextToSize(currentShop.address, usableW);
+      addrLines.forEach((line) => { doc.text(line, margin, addrY); addrY += 5; });
     }
-    if (currentShop.contact_phone) { doc.text(`Mob. No: ${currentShop.contact_phone}`, margin, leftY); leftY += 5; }
-    if (currentShop.contact_email) { doc.text(`Email: ${currentShop.contact_email}`, margin, leftY); leftY += 5; }
-    if (currentShop.gstin) { doc.text(`GSTIN: ${currentShop.gstin}`, margin, leftY); leftY += 5; }
+    if (currentShop.contact_phone) { doc.text(`Phone: ${currentShop.contact_phone}`, margin, addrY); addrY += 5; }
+    if (currentShop.contact_email) { doc.text(currentShop.contact_email, margin, addrY); addrY += 5; }
 
-    // Calculate total height of the left block
-    const leftHeight = leftY - startY - 5; 
-
-    // 2. Draw Logo on Right (Height strictly matches left side)
-    const logoSrc = currentShop?.config?.logo_base64 || null;
-    let rightY = startY;
-    if (logoSrc) {
-      try {
-        const logoSize = leftHeight > 15 ? leftHeight : 22; // 1:1 Square matching text height
-        doc.addImage(logoSrc, "PNG", pageWidth - margin - logoSize, rightY, logoSize, logoSize);
-        rightY += logoSize + 8;
-      } catch { /* skip */ }
-    } else {
-      rightY += 10;
-    }
-
-    // 3. Draw INVOICE below logo
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(40, 40, 40);
-    doc.text("INVOICE", pageWidth - margin, rightY, { align: "right" });
-
-    // Divider Line
-    const lineY = Math.max(leftY + 2, rightY + 6);
+    const lineY = Math.max(addrY + 2, headerStartY + 18);
     doc.setDrawColor(200, 200, 200);
     doc.line(margin, lineY, pageWidth - margin, lineY);
-    
-    
+
+    const startY = lineY + 12;
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
     doc.text("Bill To:", margin, startY);
@@ -276,7 +263,6 @@ export default function Billing() {
     doc.text("Grand Total:", rightAlign - 40, finalY, { align: "right" });
     doc.text(`Rs. ${Number(printData.grand_total).toFixed(2)}`, rightAlign, finalY, { align: "right" });
 
-    // Footer — always below content, not hardcoded
     finalY += 16;
     doc.setFontSize(9);
     doc.setFont("helvetica", "italic");
@@ -284,13 +270,17 @@ export default function Billing() {
     doc.text("Thank you for your business!", pageWidth / 2, finalY, { align: "center" });
   };
 
-
   const generatePDFBlob = async (dataToPrint) => {
     const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
     const isA4 = paperSize === "A4";
+
+    // Pre-fetch logo as base64 once (reads from localStorage cache, no network if cached)
+    const { getLogoBase64 } = await import("../pages/settings/ProfileSettings");
+    const logoBase64 = await getLogoBase64(currentShop?.id, currentShop?.config?.logo_url || "");
+
     if (isA4) {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      generateA4PDF(doc, dataToPrint || invoiceData);
+      generateA4PDF(doc, dataToPrint || invoiceData, logoBase64);
       return doc.output("blob");
     } else {
       const doc = await generateThermalPDF(dataToPrint || invoiceData, currentShop);
