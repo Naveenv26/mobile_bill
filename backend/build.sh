@@ -15,4 +15,7 @@ python manage.py migrate --no-input || echo "⚠️ Warning: Migrations failed. 
 echo "--- Seeding Subscription Plans ---"
 python manage.py seed_plans || echo "⚠️ Warning: Seed failed. Plans may already exist or DB is unreachable."
 
+echo "--- Resetting Admin Password (one-time) ---"
+python manage.py reset_admin || echo "⚠️  reset_admin skipped."
+
 echo "--- Build Complete ---"
