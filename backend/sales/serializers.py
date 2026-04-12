@@ -2,6 +2,11 @@ from rest_framework import serializers
 from .models import Invoice, InvoiceItem
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.SerializerMethodField()
+
+    def get_product_name(self, obj):
+        return obj.product.name if obj.product else ""
+
     class Meta:
         model = InvoiceItem
         fields = '__all__'
