@@ -165,25 +165,16 @@ const buildThermalDoc = (invoice, shop, logoBase64 = null) => {
   return doc;
 };
 
-// ── A4 PDF — with logo top-left, proper layout ───────────────────────────────
+// ── A4 PDF — with logo top-right, proper layout ───────────────────────────────
 const buildA4Doc = (invoice, shop, logoBase64 = null) => {
   const doc    = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW  = doc.internal.pageSize.getWidth();
   const margin = 15;
 
-  // Logo top-left
   let headerStartY = 20;
-  if (logoBase64) {
-    try {
-      doc.addImage(logoBase64, "PNG", margin, 8, 30, 20);
-      headerStartY = 34;
-    } catch { /* skip */ }
-  }
 
-  // Shop name left, INVOICE label right
-  doc.setFontSize(20); doc.setFont("helvetica", "bold"); doc.setTextColor(40, 40, 40);
-  doc.text("INVOICE", pageW - margin, headerStartY, { align: "right" });
-  doc.setFontSize(16); doc.setTextColor(0, 0, 0);
+  // Shop name and address on left
+  doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
   doc.text(shop?.name || "Shop Name", margin, headerStartY);
 
   // Address block left
@@ -194,9 +185,21 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
   if (shop?.contact_phone) { doc.text(`Phone: ${shop.contact_phone}`, margin, addrY); addrY += 5; }
   if (shop?.contact_email) { doc.text(shop.contact_email, margin, addrY); addrY += 5; }
 
+  // Logo top-right aligned with shop details
+  if (logoBase64) {
+    try {
+      const logoSize = 25;
+      doc.addImage(logoBase64, "PNG", pageW - margin - logoSize, headerStartY - 12, logoSize, logoSize);
+    } catch { /* skip */ }
+  }
+
   // Horizontal rule
-  const lineY = Math.max(addrY + 2, headerStartY + 18);
+  const lineY = Math.max(addrY + 2, headerStartY + 30);
   doc.setDrawColor(200, 200, 200); doc.line(margin, lineY, pageW - margin, lineY);
+
+  // INVOICE label on right, just above the line
+  doc.setFontSize(20); doc.setFont("helvetica", "bold"); doc.setTextColor(40, 40, 40);
+  doc.text("INVOICE", pageW - margin, lineY - 5, { align: "right" });
 
   // Bill To + invoice meta
   const startY = lineY + 12;
@@ -406,10 +409,10 @@ export default function InvoiceModal({ invoice, shop, onClose }) {
         {/* ── Footer Actions ── */}
         <div className="flex-shrink-0 bg-white border-t-2 border-black px-4 py-4 flex gap-3">
           <button
-            onClick={handlePrint}
+            onClick={handleDownload}
             className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-900 text-white font-bold rounded-xl border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all text-sm"
           >
-            {onAndroid ? <><DownloadIcon /> Save PDF</> : <><PrintIcon /> Print Bill</>}
+            <DownloadIcon /> Download
           </button>
           <button
             onClick={handleShare}
