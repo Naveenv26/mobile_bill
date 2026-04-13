@@ -2,7 +2,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { sharePdfNative, downloadPdfNative, isAndroidWebView } from "../utils/androidBridge.js";
-import { getLogoBase64 } from "../pages/settings/ProfileSettings.jsx";
 
 const formatCurrency = (val) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(val || 0));
@@ -280,9 +279,9 @@ export default function InvoiceModal({ invoice, shop, onClose }) {
   const filename       = `Invoice_${invoice.number || invoice.id}.pdf`;
   const isA4           = (shop?.config?.invoice?.paper_size || "80mm") === "A4";
 
-  // Fetch logo base64 from cache (instant if cached, fetches once if not)
+  // Fetch logo base64 from shop config
   const getBlob = async () => {
-    const logoBase64 = await getLogoBase64(shop?.id, shop?.config?.logo_url || "");
+    const logoBase64 = shop?.config?.logo_base64 || null;
     const doc = isA4 ? buildA4Doc(invoice, shop, logoBase64) : buildThermalDoc(invoice, shop, logoBase64);
     return doc.output("blob");
   };

@@ -328,9 +328,8 @@ export default function Billing() {
     const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
     const isA4 = paperSize === "A4";
 
-    // Pre-fetch logo as base64 once (reads from localStorage cache, no network if cached)
-    const { getLogoBase64 } = await import("../pages/settings/ProfileSettings");
-    const logoBase64 = await getLogoBase64(currentShop?.id, currentShop?.config?.logo_url || "");
+    // Get logo from shop config
+    const logoBase64 = currentShop?.config?.logo_base64 || null;
 
     if (isA4) {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
