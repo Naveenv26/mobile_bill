@@ -8,7 +8,6 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { generateThermalPDF } from "../utils/pdfGenerator.js";
 import { sharePdfNative, downloadPdfNative, isAndroidWebView } from "../utils/androidBridge.js";
-import { getLogoBase64 } from "./settings/ProfileSettings.jsx";
 
 // --- Icons ---
 const SearchIcon = () => (
@@ -34,11 +33,6 @@ const TrashIcon = () => (
 const ShareIcon = () => (
   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
     <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
-  </svg>
-);
-const PrintIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
   </svg>
 );
 const DownloadIcon = () => (
@@ -179,114 +173,163 @@ export default function Billing() {
   // ── PDF builder ─────────────────────────────────────────────────────────
   // logoBase64 is pre-fetched by generatePDFBlob so this stays synchronous
   const generateA4PDF = (doc, printData, logoBase64 = null) => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
+  const rightAlign = pageWidth - margin;
+  
+  // 1. Header Section
+  let currentY = 15;
 
-    // Logo — only use pre-fetched base64, never a raw URL
-    // Detect format from data URI so JPEG logos don't crash
-    const getImgFmt = (b64) => {
-      if (!b64) return "PNG";
-      if (b64.startsWith("data:image/jpeg") || b64.startsWith("data:image/jpg")) return "JPEG";
-      return "PNG";
-    };
-    let headerStartY = 20;
-    if (logoBase64) {
-      try {
-        doc.addImage(logoBase64, getImgFmt(logoBase64), margin, 8, 30, 20);
-        headerStartY = 34;
-      } catch { /* unsupported format — skip, don't crash */ }
+  // Header Background Accent (Optional: creates a clean line at top)
+  doc.setFillColor(30, 41, 59);
+  doc.rect(0, 0, pageWidth, 2);
+
+  // Logo (Left)
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, "PNG", margin, 10, 30, 20);
+      currentY = 35; 
+    } catch (e) { currentY = 15; }
+  }
+
+  // Shop Name & Info (Left)
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 41, 59);
+  doc.text(currentShop.name.toUpperCase(), margin, currentY);
+  
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 100, 100);
+  currentY += 6;
+
+  if (currentShop.address) {
+    const addrLines = doc.splitTextToSize(currentShop.address, 80);
+    addrLines.forEach(line => {
+      doc.text(line, margin, currentY);
+      currentY += 4;
+    });
+  }
+  if (currentShop.contact_phone) {
+    doc.text(`Ph: ${currentShop.contact_phone}`, margin, currentY);
+    currentY += 4;
+  }
+
+  // Invoice Meta Info (Right Side - Top)
+  const metaY = 15;
+  doc.setFontSize(24);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 41, 59);
+  doc.text("INVOICE", rightAlign, metaY, { align: "right" });
+
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`No: ${printData.number || printData.id}`, rightAlign, metaY + 8, { align: "right" });
+  doc.text(`Date: ${new Date().toLocaleDateString()}`, rightAlign, metaY + 13, { align: "right" });
+
+  // 2. Billing Section (Horizontal Rule)
+  currentY = Math.max(currentY + 10, 45);
+  doc.setDrawColor(230, 231, 235);
+  doc.line(margin, currentY, rightAlign, currentY);
+  currentY += 10;
+
+  // Bill To (Left)
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 41, 59);
+  doc.text("BILL TO", margin, currentY);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(0, 0, 0);
+  currentY += 6;
+  doc.text(printData.customer_name || "Walk-in Customer", margin, currentY);
+  if (printData.customer_mobile) {
+    currentY += 5;
+    doc.text(printData.customer_mobile, margin, currentY);
+  }
+
+  // 3. Table Section
+  const tableColumn = ["#", "Item Name", "Price (₹)", "Qty", "Tax %", "Total (₹)"];
+  const tableRows = (printData.items || []).map((item, i) => [
+    i + 1,
+    item.product_name || item.name,
+    Number(item.unit_price).toFixed(2),
+    item.qty,
+    `${item.tax_rate}%`,
+    (Number(item.qty) * Number(item.unit_price)).toFixed(2)
+  ]);
+
+  autoTable(doc, {
+    startY: currentY + 10,
+    head: [tableColumn],
+    body: tableRows,
+    theme: 'striped',
+    headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold', halign: 'center' },
+    bodyStyles: { textColor: 50 },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 10 },
+      2: { halign: 'right' },
+      3: { halign: 'center' },
+      4: { halign: 'center' },
+      5: { halign: 'right' }
+    },
+    margin: { left: margin, right: margin }
+  });
+
+  // 4. Totals Section
+  let finalY = doc.lastAutoTable.finalY + 10;
+  const statsX = rightAlign - 60; // Label start
+
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+
+  const rowHeight = 6;
+  const drawTotalRow = (label, value, isBold = false) => {
+    if (isBold) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(12);
     }
-
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(40, 40, 40);
-    doc.text("INVOICE", pageWidth - margin, headerStartY, { align: "right" });
-
-    doc.setFontSize(18);
-    doc.setTextColor(0, 0, 0);
-    doc.text(currentShop.name || "Shop Name", margin, headerStartY);
-
-    doc.setFontSize(9);
+    doc.text(label, statsX, finalY);
+    doc.text(value, rightAlign, finalY, { align: "right" });
+    finalY += rowHeight;
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
-
-    let addrY = headerStartY + 8;
-    const usableW = pageWidth / 2 - margin - 10;
-    if (currentShop.address) {
-      const addrLines = doc.splitTextToSize(currentShop.address, usableW);
-      addrLines.forEach((line) => { doc.text(line, margin, addrY); addrY += 5; });
-    }
-    if (currentShop.contact_phone) { doc.text(`Phone: ${currentShop.contact_phone}`, margin, addrY); addrY += 5; }
-    if (currentShop.contact_email) { doc.text(currentShop.contact_email, margin, addrY); addrY += 5; }
-
-    const lineY = Math.max(addrY + 2, headerStartY + 18);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, lineY, pageWidth - margin, lineY);
-
-    const startY = lineY + 12;
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("Bill To:", margin, startY);
-    doc.setFont("helvetica", "normal");
-    doc.text(printData.customer_name || "Walk-in Customer", margin, startY + 6);
-    if (printData.customer_mobile) doc.text(printData.customer_mobile, margin, startY + 11);
-    doc.text(`Invoice No: ${printData.number || printData.id}`, pageWidth - margin, startY, { align: "right" });
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin, startY + 6, { align: "right" });
-
-    const tableColumn = ["#", "Item Name", "Price", "Qty", "Tax %", "Total"];
-    const tableRows = (printData.items || []).map((item, i) => {
-      const price = Number(item.unit_price);
-      return [i + 1, item.product_name || item.name, price.toFixed(2), item.qty, item.tax_rate + "%", (Number(item.qty) * price).toFixed(2)];
-    });
-
-    autoTable(doc, {
-      startY: startY + 20,
-      head: [tableColumn],
-      body: tableRows,
-      headStyles: { fillColor: [30, 41, 59], textColor: 255 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: margin, right: margin },
-    });
-
-    let finalY = doc.lastAutoTable.finalY + 10;
-    const rightAlign = pageWidth - margin;
-    const st = Number(printData.subtotal || 0);
-    const tx = Number(printData.tax_total || 0);
-    const dc = Number(printData.discount_total || 0);
-
-    doc.text("Subtotal:", rightAlign - 40, finalY, { align: "right" });
-    doc.text(`${st.toFixed(2)}`, rightAlign, finalY, { align: "right" });
-    if (dc > 0) {
-      finalY += 6;
-      doc.setTextColor(0, 100, 0);
-      doc.text("Discount:", rightAlign - 40, finalY, { align: "right" });
-      doc.text(`-${dc.toFixed(2)}`, rightAlign, finalY, { align: "right" });
-      doc.setTextColor(0, 0, 0);
-    }
-    if (tx > 0) {
-      finalY += 6; doc.text("CGST:", rightAlign - 40, finalY, { align: "right" }); doc.text(`${(tx / 2).toFixed(2)}`, rightAlign, finalY, { align: "right" });
-      finalY += 6; doc.text("SGST:", rightAlign - 40, finalY, { align: "right" }); doc.text(`${(tx / 2).toFixed(2)}`, rightAlign, finalY, { align: "right" });
-    }
-
-    finalY += 10;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Grand Total:", rightAlign - 40, finalY, { align: "right" });
-    doc.text(`Rs. ${Number(printData.grand_total).toFixed(2)}`, rightAlign, finalY, { align: "right" });
-
-    finalY += 16;
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "italic");
-    doc.setTextColor(150, 150, 150);
-    doc.text("Thank you for your business!", pageWidth / 2, finalY, { align: "center" });
+    doc.setFontSize(10);
   };
+
+  drawTotalRow("Subtotal:", Number(printData.subtotal).toFixed(2));
+  
+  if (Number(printData.discount_total) > 0) {
+    doc.setTextColor(220, 38, 38);
+    drawTotalRow("Discount:", `-${Number(printData.discount_total).toFixed(2)}`);
+  }
+  
+  if (Number(printData.tax_total) > 0) {
+    drawTotalRow("GST Total:", Number(printData.tax_total).toFixed(2));
+  }
+
+  finalY += 2;
+  doc.setDrawColor(30, 41, 59);
+  doc.setLineWidth(0.5);
+  doc.line(statsX, finalY - 4, rightAlign, finalY - 4);
+  
+  drawTotalRow("GRAND TOTAL:", `Rs. ${Number(printData.grand_total).toFixed(2)}`, true);
+
+  // 5. Footer
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(150, 150, 150);
+  doc.text("Thank you for your business!", pageWidth / 2, pageHeight - 15, { align: "center" });
+};
 
   const generatePDFBlob = async (dataToPrint) => {
     const paperSize = currentShop?.config?.invoice?.paper_size || "80mm";
     const isA4 = paperSize === "A4";
 
-    // Reads from localStorage cache — instant if already cached, fetches once if not
-    const logoBase64 = await getLogoBase64(currentShop?.id, currentShop?.config?.logo_url || "");
+    // Get logo from shop config
+    const logoBase64 = currentShop?.config?.logo_base64 || null;
 
     if (isA4) {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -317,7 +360,8 @@ export default function Billing() {
     }
   };
 
-  // ── Download / Print ────────────────────────────────────────────────────  // In WebView: saves to Downloads folder via bridge
+  // ── Download / Print ────────────────────────────────────────────────────
+  // In WebView: saves to Downloads folder via bridge
   // In browser: downloads via <a> tag
   const handleDownload = async () => {
     setIsGeneratingPDF(true);
@@ -328,37 +372,6 @@ export default function Billing() {
     } catch (err) {
       console.error("Download failed", err);
       toast.error("Could not save invoice.");
-    } finally {
-      setIsGeneratingPDF(false);
-    }
-  };
-
-  // ── Reset ───────────────────────────────────────────────────────────────
-  const handlePrint = async () => {
-    setIsGeneratingPDF(true);
-    try {
-      const blob = await generatePDFBlob(invoiceData);
-      if (onAndroid) {
-        await downloadPdfNative(blob, invoiceFilename);
-        toast.success("Saved to Downloads!");
-      } else {
-        const url = URL.createObjectURL(blob);
-        const old = document.getElementById("__bill_print_frame");
-        if (old) old.remove();
-        const iframe = document.createElement("iframe");
-        iframe.id = "__bill_print_frame";
-        iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;";
-        iframe.src = url;
-        iframe.onload = () => {
-          try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
-          catch { window.open(url, "_blank"); }
-          setTimeout(() => { if (iframe.parentNode) iframe.remove(); }, 60000);
-        };
-        document.body.appendChild(iframe);
-      }
-    } catch (err) {
-      console.error("Print failed", err);
-      toast.error("Could not print invoice.");
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -507,28 +520,32 @@ export default function Billing() {
       </div>
 
       {/* ── Floating Cart Bar ── */}
-      {cart.length > 0 && !isCartOpen && (
-        <div className="fixed bottom-16 lg:bottom-6 left-3 right-3 lg:left-[calc(288px+12px)] z-30">
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="w-full bg-slate-900 text-white p-1 rounded-2xl border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-stretch overflow-hidden active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all"
-          >
-            <div className="flex-1 px-5 py-3 flex flex-col items-start justify-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{totalItems} Items</span>
-              <span className="text-xl font-black tracking-tight">₹{total.toFixed(2)}</span>
-            </div>
-            <div className="bg-indigo-600 px-6 flex items-center justify-center rounded-xl">
-              <div className="flex items-center gap-2 font-bold text-sm">
-                View Bill <ChevronRight />
+        {cart.length > 0 && !isCartOpen && (
+          <div className="fixed bottom-[72px] md:bottom-8 left-4 right-4 lg:left-80 lg:right-8 z-30 transition-all duration-300">
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="w-full max-w-5xl mx-auto bg-slate-900 text-white p-1 rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-stretch overflow-hidden active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all"
+            >
+              <div className="flex-1 px-6 py-3 flex flex-col items-start justify-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {totalItems} Items
+                </span>
+                <span className="text-xl font-black tracking-tight">
+                  ₹{total.toFixed(2)}
+                </span>
               </div>
-            </div>
-          </button>
-        </div>
-      )}
+              <div className="bg-indigo-600 px-8 flex items-center justify-center rounded-xl border-l-2 border-black">
+                <div className="flex items-center gap-2 font-extrabold text-sm uppercase tracking-tight">
+                  View Bill <ChevronRight />
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
 
       {/* ── Cart Drawer ── */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm pb-[64px] sm:pb-0">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm pb-16 sm:pb-0">
           <div className="bg-white w-full sm:w-[500px] sm:rounded-2xl rounded-t-3xl shadow-2xl border-2 border-black max-h-[88vh] flex flex-col">
             {/* Drag handle (mobile) */}
             <div className="w-full flex justify-center pt-3 pb-1 sm:hidden cursor-pointer" onClick={() => setIsCartOpen(false)}>
@@ -645,6 +662,7 @@ export default function Billing() {
               </div>
 
               <div className="space-y-3">
+                {/* Share button — WhatsApp on web, native share sheet on Android */}
                 <button
                   onClick={handleShare}
                   disabled={isGeneratingPDF}
@@ -657,22 +675,14 @@ export default function Billing() {
                   )}
                 </button>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={handlePrint}
-                    disabled={isGeneratingPDF}
-                    className="flex-1 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-bold border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all"
-                  >
-                    <PrintIcon /> {onAndroid ? "Save PDF" : "Print"}
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    disabled={isGeneratingPDF}
-                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-bold border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all"
-                  >
-                    <DownloadIcon /> Download
-                  </button>
-                </div>
+                {/* Download / Print — saves to Downloads on Android, browser download on web */}
+                <button
+                  onClick={handleDownload}
+                  disabled={isGeneratingPDF}
+                  className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-bold border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all"
+                >
+                  <DownloadIcon /> {onAndroid ? "Save to Downloads" : "Download PDF"}
+                </button>
 
                 <button
                   onClick={resetBilling}
