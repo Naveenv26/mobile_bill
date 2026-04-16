@@ -137,12 +137,12 @@ export default function Settings() {
         return <InvoiceSettings settings={config.invoice || {}} onUpdate={(d) => updateSettings('invoice', d)} />;
       case "inventory": 
         return <InventorySettings settings={config.inventory || {}} onUpdate={(d) => updateSettings('inventory', d)} />;
-      case "tax": 
-        return <TaxSettings settings={config.tax || {}} onUpdate={(d) => updateSettings('tax', d)} />;
-      case "reports": 
-        return <NotificationSettings settings={config.notifications || {}} onUpdate={(d) => updateSettings('notifications', d)} />;
-      case "customers": 
-        return <CustomerSettings settings={config.customer || {}} onUpdate={(d) => updateSettings('customer', d)} />;
+      // case "tax": 
+      //   return <TaxSettings settings={config.tax || {}} onUpdate={(d) => updateSettings('tax', d)} />;
+      // case "reports": 
+      //   return <NotificationSettings settings={config.notifications || {}} onUpdate={(d) => updateSettings('notifications', d)} />;
+      // case "customers": 
+      //   return <CustomerSettings settings={config.customer || {}} onUpdate={(d) => updateSettings('customer', d)} />;
       case "feedback": 
         return <FeedbackSettings />;
       default: return null;
@@ -153,9 +153,9 @@ export default function Settings() {
     { id: "profile", label: "Shop Profile", desc: "Name, Address, Logo", icon: <Icons.Profile /> },
     { id: "invoice", label: "Invoice & Billing", desc: "Print size, Prefixes", icon: <Icons.Invoice /> },
     { id: "inventory", label: "Inventory Rules", desc: "Units, Thresholds", icon: <Icons.Inventory /> },
-    { id: "tax", label: "Tax & Currency", desc: "GST, Symbols", icon: <Icons.Tax /> },
-    { id: "reports", label: "Daily Reports", desc: "Email summaries", icon: <Icons.Report /> },
-    { id: "customers", label: "Customers", desc: "Defaults, Credits", icon: <Icons.Customer /> },
+    // { id: "tax", label: "Tax & Currency", desc: "GST, Symbols", icon: <Icons.Tax /> },
+    // { id: "reports", label: "Daily Reports", desc: "Email summaries", icon: <Icons.Report /> },
+    // { id: "customers", label: "Customers", desc: "Defaults, Credits", icon: <Icons.Customer /> },
     { id: "feedback", label: "Feedback", desc: "Rate us", icon: <Icons.Feedback /> },
   ];
 
