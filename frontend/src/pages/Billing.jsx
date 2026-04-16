@@ -521,7 +521,7 @@ export default function Billing() {
 
       {/* ── Floating Cart Bar ── */}
         {cart.length > 0 && !isCartOpen && (
-          <div className="fixed bottom-[120px] md:bottom-[120px] lg:bottom-[5px] left-4 right-4 lg:left-80 lg:right-8 z-30 transition-all duration-300">
+          <div className="fixed bottom-[110px] md:bottom-[110px] lg:bottom-[15px] left-4 right-4 lg:left-80 lg:right-8 z-30 transition-all duration-300">
             <button
               onClick={() => setIsCartOpen(true)}
               className="w-full max-w-5xl mx-auto bg-slate-900 text-white p-1 rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-stretch overflow-hidden active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all"
