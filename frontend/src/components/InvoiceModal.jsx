@@ -331,37 +331,42 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl border-2 border-black overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div 
+        className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl border-2 border-black overflow-hidden max-h-[80vh] sm:max-h-[90vh] flex flex-col animate-slide-up mb-24 sm:mb-0" 
+        onClick={(e) => e.stopPropagation()}
+      >
 
         {/* ── Dark Header ── */}
         <div className="relative bg-slate-900 px-6 pt-6 pb-7 flex-shrink-0">
 
-          {/* Top-right icon buttons: Edit, Delete, Print then Close */}
+          {/* Top-right icon buttons */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
             <button
-              onClick={() => toast("Edit feature coming in next update!")}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white"
-              title="Edit Invoice"
+              onClick={() => toast("Edit coming soon!")}
+              className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white"
+              title="Edit"
             >
               <EditIcon />
             </button>
             <button
               onClick={handleDelete}
-              className="p-2 bg-red-500/20 hover:bg-red-500/40 rounded-xl transition-colors text-red-400"
-              title="Delete Invoice"
+              className="w-9 h-9 flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 rounded-xl transition-colors text-red-400"
+              title="Delete"
             >
               <TrashIcon />
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white text-xs font-bold"
-              title={onAndroid ? "Save PDF" : "Print"}
+              className="h-9 px-3 flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white text-xs font-bold"
             >
               <PrintIcon />
-              {onAndroid ? "Save" : "Print"}
+              <span className="hidden xs:inline">Print</span>
             </button>
-            <button onClick={onClose} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white" title="Close">
+            <button 
+              onClick={onClose} 
+              className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white"
+            >
               <CloseIcon />
             </button>
           </div>
