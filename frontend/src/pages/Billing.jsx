@@ -100,11 +100,19 @@ export default function Billing() {
   };
 
   const addToCart = (p) => {
+    const inCart = cart.find((c) => c.id === p.id);
+    const currentQty = inCart ? inCart.qty : 0;
+    
+    if (currentQty + 1 > p.stock) {
+      toast.error(`Out of stock! Only ${p.stock} available.`);
+      return;
+    }
+
     setCart((prev) => {
-      const found = prev.find((c) => c.id === p.id);
-      if (found) return prev.map((c) => (c.id === p.id ? { ...c, qty: c.qty + 1 } : c));
+      if (inCart) return prev.map((c) => (c.id === p.id ? { ...c, qty: c.qty + 1 } : c));
       return [...prev, { ...p, qty: 1 }];
     });
+
     toast.custom(
       (t) => (
         <div className={`${t.visible ? "animate-enter" : "animate-leave"} bg-slate-800 text-white shadow-lg rounded-full px-4 py-2 flex items-center gap-2`}>
@@ -120,7 +128,14 @@ export default function Billing() {
 
   const updateQty = (id, newQty) => {
     if (newQty <= 0) { setCart((prev) => prev.filter((c) => c.id !== id)); return; }
-    setCart((prev) => prev.map((c) => (c.id === id ? { ...c, qty: newQty } : c)));
+    setCart((prev) => {
+      const item = prev.find((c) => c.id === id);
+      if (item && newQty > item.stock) {
+        toast.error(`Out of stock! Only ${item.stock} available.`);
+        return prev;
+      }
+      return prev.map((c) => (c.id === id ? { ...c, qty: newQty } : c));
+    });
   };
 
   // ── Totals ──────────────────────────────────────────────────────────────
@@ -135,6 +150,13 @@ export default function Billing() {
   const finalizeInvoice = async () => {
     if (!cart.length) return toast.error("Cart is empty");
     if (typeof hasFeature === "function" && !hasFeature("billing")) return toast.error("Upgrade plan required.");
+
+    // Final stock check before submission
+    for (const item of cart) {
+      if (item.qty > item.stock) {
+        return toast.error(`Stock exceeded for ${item.name}. Max: ${item.stock}`);
+      }
+    }
 
     try {
       const payload = {
@@ -455,7 +477,10 @@ export default function Billing() {
           <div className="flex flex-col gap-2">
             {filteredProducts.map((p) => {
               const inCart = cart.find((c) => c.id === p.id);
-              const outOfStock = p.stock === 0;
+              const remainingStock = p.stock - (inCart?.qty || 0);
+              const outOfStock = remainingStock <= 0;
+              const isInitiallyOutOfStock = p.stock <= 0;
+
               return (
                 <div
                   key={p.id}
@@ -466,15 +491,15 @@ export default function Billing() {
                     shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
                     active:shadow-none active:translate-x-[2px] active:translate-y-[2px]
                     transition-all duration-100 cursor-pointer select-none
-                    ${outOfStock ? "opacity-50 cursor-not-allowed" : ""}
+                    ${isInitiallyOutOfStock ? "opacity-50 cursor-not-allowed" : ""}
                     ${inCart ? "bg-indigo-50 border-indigo-600 shadow-[2px_2px_0px_0px_rgba(79,70,229,1)]" : ""}
                   `}
                 >
                   {/* Left: Name + stock */}
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-slate-900 text-sm leading-tight truncate">{p.name}</p>
-                    <span className={`text-[10px] font-bold tracking-wide ${p.stock > 0 ? "text-green-600" : "text-red-500"}`}>
-                      {p.stock > 0 ? `${p.stock} in stock` : "Out of stock"}
+                    <span className={`text-[10px] font-bold tracking-wide ${remainingStock > 0 ? "text-green-600" : "text-red-500"}`}>
+                      {remainingStock > 0 ? `${remainingStock} in stock` : "Out of stock"}
                     </span>
                   </div>
 
@@ -495,9 +520,16 @@ export default function Billing() {
                       >
                         {inCart.qty === 1 ? <TrashIcon /> : <MinusIcon />}
                       </button>
-                      <span className="w-7 text-center font-extrabold text-slate-900 text-sm select-none">
-                        {inCart.qty}
-                      </span>
+                      <input
+                        type="number"
+                        value={inCart.qty}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (isNaN(val)) return;
+                          updateQty(inCart.id, val);
+                        }}
+                        className="w-9 text-center font-extrabold text-slate-900 text-sm bg-transparent border-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                       <button
                         onClick={() => updateQty(inCart.id, inCart.qty + 1)}
                         className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 rounded-r-xl transition-colors active:bg-slate-200"
@@ -573,7 +605,16 @@ export default function Billing() {
                     <button onClick={() => updateQty(item.id, item.qty - 1)} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition-colors">
                       {item.qty === 1 ? <TrashIcon /> : <MinusIcon />}
                     </button>
-                    <span className="w-7 text-center font-extrabold text-slate-900 text-sm select-none">{item.qty}</span>
+                    <input
+                      type="number"
+                      value={item.qty}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (isNaN(val)) return;
+                        updateQty(item.id, val);
+                      }}
+                      className="w-8 text-center font-extrabold text-slate-900 text-sm bg-transparent border-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                     <button onClick={() => updateQty(item.id, item.qty + 1)} className="w-8 h-8 flex items-center justify-center bg-slate-900 text-white hover:bg-slate-700 transition-colors">
                       <PlusIcon />
                     </button>

@@ -49,6 +49,13 @@ export default function Reports() {
     const exportMenuRef  = useRef(null);
     const currentShop    = JSON.parse(localStorage.getItem("shop")) || {};
 
+    const loadInvoices = async () => {
+        try {
+            const inv = await fetchAllInvoices();
+            setInvoices(inv);
+        } catch (e) { console.error(e); }
+    };
+
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
@@ -61,6 +68,11 @@ export default function Reports() {
         };
         loadData();
     }, []);
+
+    if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 text-sm animate-pulse">Loading Data...</div>;
+
+    return (
+        <div className="min-h-screen bg-[#F8FAFC] font-sans pb-24">
 
     const handleExport = () => {
         if (!hasFeature("export")) return;
@@ -240,7 +252,7 @@ export default function Reports() {
                 )}
             </div>
 
-            {selectedInvoice && <InvoiceModal invoice={selectedInvoice} shop={currentShop} onClose={() => setSelectedInvoice(null)} />}
+            {selectedInvoice && <InvoiceModal invoice={selectedInvoice} shop={currentShop} onUpdate={loadInvoices} onClose={() => setSelectedInvoice(null)} />}
 
             <style>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
         </div>

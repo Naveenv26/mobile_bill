@@ -150,7 +150,7 @@ class InvoiceViewSet(ShopFilteredViewSet):
             'items__product'
         ).order_by('-invoice_date')
 
-    @transaction.atomic                          # ✅ entire invoice creation is atomic
+    @transaction.atomic
     def perform_create(self, serializer):
         user = self.request.user
         shop = user.shop
@@ -178,6 +178,51 @@ class InvoiceViewSet(ShopFilteredViewSet):
                     item.oversold = True      # ✅ mark as oversold
                     item.save()
                 # Don't block the sale — just flag it
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        invoice = self.get_object()
+        shop = invoice.shop
+        
+        # 1. Revert stock
+        for item in invoice.items.all():
+            Product.objects.filter(id=item.product_id, shop=shop).update(
+                quantity=F('quantity') + item.qty
+            )
+        
+        # 2. Identify the sequence number of the deleted invoice
+        try:
+            parts = invoice.number.split('-')
+            current_num = int(parts[-1])
+        except (ValueError, IndexError):
+            invoice.delete()
+            return Response({"message": "Invoice deleted (non-standard format)"}, status=status.HTTP_200_OK)
+
+        invoice.delete()
+
+        # 3. Decrement shop counter
+        if shop.counter_invoice > 0:
+            Shop.objects.filter(id=shop.id).update(counter_invoice=F('counter_invoice') - 1)
+
+        # 4. Renumber subsequent invoices
+        subsequent_invoices = Invoice.objects.filter(shop=shop).order_by('id')
+        
+        to_update = []
+        for inv in subsequent_invoices:
+            try:
+                inv_parts = inv.number.split('-')
+                inv_num = int(inv_parts[-1])
+                if inv_num > current_num:
+                    inv_parts[-1] = str(inv_num - 1)
+                    inv.number = '-'.join(inv_parts)
+                    to_update.append(inv)
+            except (ValueError, IndexError):
+                continue
+        
+        for inv in sorted(to_update, key=lambda x: int(x.number.split('-')[-1])):
+            inv.save(update_fields=['number'])
+
+        return Response({"message": "Invoice deleted and sequence renumbered successfully."}, status=status.HTTP_200_OK)
 class ShopViewSet(viewsets.ModelViewSet):
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer

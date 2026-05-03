@@ -14,6 +14,8 @@ const CloseIcon    = () => <svg className="w-5 h-5" fill="none" stroke="currentC
 const PrintIcon    = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>;
 const ShareIcon    = () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" /></svg>;
 const DownloadIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+const TrashIcon    = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+const EditIcon     = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
 
 // ── Print via hidden iframe ───────────────────────────────────────────────────
 const printBlobURL = (url) => {
@@ -271,8 +273,12 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
   return doc;
 };
 
+// ── Imports ──────────────────────────────────────────────────────────────────
+import { deleteInvoice } from "../api/invoices.js";
+import toast from "react-hot-toast";
+
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function InvoiceModal({ invoice, shop, onClose }) {
+export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
   if (!invoice) return null;
 
   const onAndroid  = isAndroidWebView();
@@ -312,15 +318,41 @@ export default function InvoiceModal({ invoice, shop, onClose }) {
     await downloadPdfNative(blob, filename);
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure? This will delete the invoice, renumber all subsequent bills, and revert stock.")) return;
+    try {
+      await deleteInvoice(invoice.id);
+      toast.success("Invoice deleted & renumbered!");
+      if (onUpdate) onUpdate();
+      onClose();
+    } catch (err) {
+      toast.error("Failed to delete invoice.");
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl border-2 border-black overflow-hidden max-h-[90vh] flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4" onClick={onClose}>
+      <div className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl border-2 border-black overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
 
         {/* ── Dark Header ── */}
         <div className="relative bg-slate-900 px-6 pt-6 pb-7 flex-shrink-0">
 
-          {/* Top-right icon buttons: Print then Close */}
+          {/* Top-right icon buttons: Edit, Delete, Print then Close */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
+            <button
+              onClick={() => toast("Edit feature coming in next update!")}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white"
+              title="Edit Invoice"
+            >
+              <EditIcon />
+            </button>
+            <button
+              onClick={handleDelete}
+              className="p-2 bg-red-500/20 hover:bg-red-500/40 rounded-xl transition-colors text-red-400"
+              title="Delete Invoice"
+            >
+              <TrashIcon />
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white text-xs font-bold"
