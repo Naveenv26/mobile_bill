@@ -191,10 +191,11 @@ BREVO_API_KEY = env('BREVO_API_KEY', default='')
 # =======================================
 CORS_ALLOW_CREDENTIALS = True
 
-FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
+FRONTEND_URL = env('FRONTEND_URL', default='https://sparkbill.vercel.app')
 
 CORS_ALLOWED_ORIGINS = [
     FRONTEND_URL,
+    'https://sparkbill.vercel.app',
     'http://localhost:5173',
     'http://localhost:3000',
 ]
@@ -205,6 +206,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 CSRF_TRUSTED_ORIGINS = [
     FRONTEND_URL,
+    'https://sparkbill.vercel.app',
     'http://localhost:5173',
     'https://mobile-bill.onrender.com',
 ]

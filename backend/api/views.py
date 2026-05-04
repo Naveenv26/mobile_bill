@@ -43,25 +43,24 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from accounts.models import PhoneVerification
-User = get_user_model()
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def check_availability(request):
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
     email = request.data.get('email', '').strip()
     mobile = request.data.get('mobile', '').strip()
     
     if email:
-        exists = User.objects.filter(email__iexact=email).exists()
-        print(f"[Check] Email: {email} | Exists: {exists}")
-        if exists:
+        if User.objects.filter(email__iexact=email).exists():
             return Response({"error": "This email is already registered."}, status=400)
     
     if mobile:
         from shops.models import Shop
-        exists = Shop.objects.filter(contact_phone=mobile).exists()
-        print(f"[Check] Mobile: {mobile} | Exists: {exists}")
-        if exists:
+        if Shop.objects.filter(contact_phone=mobile).exists():
             return Response({"error": "This mobile number is already registered."}, status=400)
             
     return Response({"message": "Available"})
