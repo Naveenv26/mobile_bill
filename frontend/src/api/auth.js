@@ -4,7 +4,7 @@ import client, { simpleLogout } from "./axios"; // <-- Import new unified client
 // Login user
 export async function login(email, password) {
   // Use the unified client for logging in
-  const res = await client.post(`/token/`, { email: email, password });
+  const res = await client.post(`/auth/login/`, { email: email, password });
   
   if (res.data.access) {
     localStorage.setItem("access_token", res.data.access);
