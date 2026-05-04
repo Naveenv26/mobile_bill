@@ -283,6 +283,7 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
   if (!invoice) return null;
 
   const onAndroid  = isAndroidWebView();
+  const navigate = useNavigate();
   const customerName   = invoice.customer_detail?.name   || invoice.customer_name   || "Walk-in";
   const customerMobile = invoice.customer_detail?.mobile || invoice.customer_mobile || "";
   const invoiceDate    = invoice.created_at || invoice.invoice_date;
@@ -331,14 +332,6 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={onClose}>
-      <div 
-        className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl border-2 border-black overflow-hidden max-h-[80vh] sm:max-h-[90vh] flex flex-col animate-slide-up mb-24 sm:mb-0" 
-        onClick={(e) => e.stopPropagation()}
-      >
-
-  const navigate = useNavigate();
 
   const handleEdit = () => {
     // Navigate to billing with the current invoice data
