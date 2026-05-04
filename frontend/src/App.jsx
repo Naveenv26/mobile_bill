@@ -14,6 +14,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import ShopSetup from "./pages/ShopSetup";
 import ResetPassword from "./pages/ResetPassword";
+import AdminOTPLogs from "./pages/AdminOTPLogs";
 
 import Layout from "./components/Layout";
 import PrivateRoute from "./components/PrivateRoute";
@@ -119,6 +120,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/admin-otp" element={<AdminOTPLogs />} />
 
           {/* Subscription required */}
           <Route

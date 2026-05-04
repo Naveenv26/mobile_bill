@@ -71,8 +71,11 @@ urlpatterns = [
     path("register-shop/", register_shop, name="register_shop"),
 
     # Auth
-    path("auth/register/", RegisterView.as_view(), name="register"),
-    path("token/", CookieTokenObtainPairView.as_view(), name="login"),
+    path('auth/register/', ShopRegistrationView.as_view(), name='register'),
+    path('auth/send-otp/', views.send_otp, name='send_otp'),
+    path('auth/verify-otp/', views.verify_otp, name='verify_otp'),
+    path('auth/admin-otp-logs/', views.admin_otp_logs, name='admin_otp_logs'),
+    path('auth/login/', CustomTokenObtainPairView.as_view(), name='login'),
     path("auth/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
     path("auth/logout/", logout_view, name="logout"),
 

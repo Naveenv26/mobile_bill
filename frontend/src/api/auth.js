@@ -36,6 +36,18 @@ export async function registerUser(data) {
   return res.data;
 }
 
+// Send OTP
+export async function sendOTP(phone) {
+  const res = await client.post(`/auth/send-otp/`, { phone });
+  return res.data;
+}
+
+// Verify OTP
+export async function verifyOTP(phone, otp) {
+  const res = await client.post(`/auth/verify-otp/`, { phone, otp });
+  return res.data;
+}
+
 // Forgot password
 export async function forgotPassword(email) {
   const res = await client.post(`/auth/forgot-password/`, { email });

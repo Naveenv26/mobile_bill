@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { login, registerUser, forgotPassword } from "../api/auth";
+import { login, registerUser, forgotPassword, sendOTP, verifyOTP } from "../api/auth";
 import { toast } from "react-hot-toast";
 
 export default function Login() {
@@ -8,6 +8,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  // OTP State
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otp, setOtp] = useState("");
 
   // Form data state
   const [form, setForm] = useState({
@@ -21,6 +27,37 @@ export default function Login() {
 
   const handleChange = (e) =>
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  // ---------- OTP HANDLERS ----------
+  const handleSendOTP = async () => {
+    if (form.mobile.length !== 10) return;
+    setOtpLoading(true);
+    setError("");
+    try {
+      // Mocking successful send and auto-verifying since SMS plan is on hold
+      setOtpSent(true);
+      setOtpVerified(true); 
+      toast.success("Mobile number accepted (SMS Verification Bypassed)");
+    } catch (err) {
+      toast.error("Failed to process mobile number.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (otp.length !== 6) return;
+    setOtpLoading(true);
+    try {
+      await verifyOTP(form.mobile, otp);
+      setOtpVerified(true);
+      toast.success("Mobile verified!");
+    } catch (err) {
+      toast.error("Invalid OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
 
   // Helper to extract error messages from Django API
   const getErrorMessage = (err) => {
@@ -56,11 +93,21 @@ export default function Login() {
   };
 
   // ---------- SIGNUP (Step 1) ----------
+  const validatePassword = (pwd) => {
+    return {
+      length: pwd.length >= 8,
+      upper: /[A-Z]/.test(pwd),
+      lower: /[a-z]/.test(pwd),
+      number: /[0-9]/.test(pwd),
+      symbol: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
+    };
+  };
+
   const handleSignupStep1 = (e) => {
     e.preventDefault();
-    // Basic password validation
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+    const v = validatePassword(form.password);
+    if (!v.length || !v.upper || !v.lower || !v.number || !v.symbol) {
+      setError("Please meet all password requirements.");
       return;
     }
     setError("");
@@ -110,6 +157,8 @@ export default function Login() {
   };
 
   // ---------- RENDER UI ----------
+  const pwdStatus = validatePassword(form.password);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
@@ -207,6 +256,7 @@ export default function Login() {
                     value={form.email}
                     onChange={handleChange}
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Owner's email"
                     required
                   />
                 </div>
@@ -218,11 +268,27 @@ export default function Login() {
                     value={form.password}
                     onChange={handleChange}
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Strong password"
                     required
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Minimum 8 characters</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[
+                      { label: "8+ Characters", met: pwdStatus.length },
+                      { label: "Uppercase (A)", met: pwdStatus.upper },
+                      { label: "Lowercase (a)", met: pwdStatus.lower },
+                      { label: "Number (1)", met: pwdStatus.number },
+                      { label: "Symbol (@)", met: pwdStatus.symbol },
+                    ].map((req, i) => (
+                      <div key={i} className={`flex items-center gap-1.5 text-[10px] font-bold ${req.met ? "text-green-600" : "text-slate-400"}`}>
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center border ${req.met ? "bg-green-100 border-green-200" : "bg-slate-50 border-slate-200"}`}>
+                          {req.met && <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" /></svg>}
+                        </div>
+                        {req.label}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <button className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-transform active:scale-[0.98]">
+                <button className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-transform active:scale-[0.98] mt-4">
                   Continue
                 </button>
                 <button type="button" onClick={() => setView("login")} className="w-full py-2 text-sm font-bold text-slate-500 hover:text-slate-700">
@@ -231,53 +297,97 @@ export default function Login() {
               </form>
             ) : (
               <form onSubmit={handleSignupStep2} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Shop Name</label>
-                  <input
-                    name="shopName"
-                    value={form.shopName}
-                    onChange={handleChange}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mobile</label>
-                    <input
-                      name="mobile"
-                      value={form.mobile}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                      required
-                    />
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Shop Details</p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Shop Name</label>
+                      <input
+                        name="shopName"
+                        value={form.shopName}
+                        onChange={handleChange}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="e.g. Spark Enterprises"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">10-Digit Mobile Number</label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            name="mobile"
+                            type="tel"
+                            maxLength="10"
+                            value={form.mobile}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, "");
+                              setForm(p => ({ ...p, mobile: val }));
+                            }}
+                            disabled={otpVerified}
+                            className={`w-full p-3 bg-white border ${otpVerified ? "border-green-500 bg-green-50" : "border-slate-200"} rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-colors`}
+                            placeholder="9876543210"
+                            required
+                          />
+                          {otpVerified && <span className="absolute right-3 top-3 text-green-600 font-bold text-xs flex items-center gap-1"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" /></svg> Verified</span>}
+                        </div>
+                        {!otpVerified && (
+                          <button
+                            type="button"
+                            onClick={handleSendOTP}
+                            disabled={form.mobile.length !== 10 || otpLoading}
+                            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl disabled:opacity-50 active:scale-95 transition-all"
+                          >
+                            {otpSent ? "Resend" : "Send OTP"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {otpSent && !otpVerified && (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Enter 6-Digit OTP</label>
+                        <div className="flex gap-2">
+                          <input
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.substring(0,6))}
+                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-center font-bold tracking-[0.5em] text-lg"
+                            placeholder="000000"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVerifyOTP}
+                            disabled={otp.length !== 6 || otpLoading}
+                            className="px-6 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+                          >
+                            Verify
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Shop Address</label>
+                      <textarea
+                        name="shopAddress"
+                        value={form.shopAddress}
+                        onChange={handleChange}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm"
+                        placeholder="Full business address"
+                        required
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">GSTIN (Optional)</label>
-                    <input
-                      name="gstin"
-                      value={form.gstin}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Shop Address</label>
-                  <textarea
-                    name="shopAddress"
-                    value={form.shopAddress}
-                    onChange={handleChange}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none"
-                    required
-                  />
-                </div>
-                <div className="flex gap-3 pt-2">
+
+                <div className="flex gap-3 pt-4">
                   <button type="button" onClick={() => setStep(1)} className="flex-1 py-3.5 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition">
                     Back
                   </button>
-                  <button disabled={loading} className="flex-[2] py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 disabled:opacity-70">
-                    {loading ? "Creating..." : "Complete Setup"}
+                  <button disabled={loading || !otpVerified} className="flex-[2] py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 disabled:opacity-70 disabled:cursor-not-allowed">
+                    {loading ? "Registering..." : "Complete Setup"}
                   </button>
                 </div>
               </form>

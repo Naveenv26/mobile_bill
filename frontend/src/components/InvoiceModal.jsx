@@ -275,6 +275,7 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 import { deleteInvoice } from "../api/invoices.js";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -337,59 +338,86 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
         onClick={(e) => e.stopPropagation()}
       >
 
-        {/* ── Dark Header ── */}
-        <div className="relative bg-slate-900 px-6 pt-6 pb-7 flex-shrink-0">
+  const navigate = useNavigate();
 
-          {/* Top-right icon buttons */}
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            <button
-              onClick={() => toast("Edit coming soon!")}
-              className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white"
-              title="Edit"
-            >
-              <EditIcon />
-            </button>
-            <button
-              onClick={handleDelete}
-              className="w-9 h-9 flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 rounded-xl transition-colors text-red-400"
-              title="Delete"
-            >
-              <TrashIcon />
-            </button>
-            <button
-              onClick={handlePrint}
-              className="h-9 px-3 flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white text-xs font-bold"
-            >
-              <PrintIcon />
-              <span className="hidden xs:inline">Print</span>
-            </button>
-            <button 
-              onClick={onClose} 
-              className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white"
-            >
-              <CloseIcon />
-            </button>
+  const handleEdit = () => {
+    // Navigate to billing with the current invoice data
+    navigate("/billing", { 
+      state: { 
+        editMode: true,
+        invoiceId: invoice.id,
+        initialCart: (invoice.items || []).map(it => ({
+          product: it.product,
+          product_name: it.product_name,
+          qty: Number(it.qty),
+          unit_price: Number(it.unit_price),
+          tax_rate: Number(it.tax_rate || 0),
+          line_total: Number(it.line_total)
+        })),
+        initialCustomer: {
+          name: customerName,
+          mobile: customerMobile
+        },
+        initialDiscount: Number(invoice.discount_total || 0),
+        initialPaymentMode: invoice.payment_mode || "cash"
+      }
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div 
+        className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl border-2 border-black overflow-hidden max-h-[80vh] sm:max-h-[90vh] flex flex-col animate-slide-up mb-24 sm:mb-0" 
+        onClick={(e) => e.stopPropagation()}
+      >
+
+        {/* ── Dark Header ── */}
+        <div className="bg-slate-900 px-6 pt-6 pb-7 flex-shrink-0">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">
+                Invoice #{invoice.number || invoice.id}
+              </p>
+              <h2 className="text-3xl font-black text-white leading-none">{formatCurrency(invoice.grand_total)}</h2>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleEdit}
+                className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-white"
+                title="Edit"
+              >
+                <EditIcon />
+              </button>
+              <button
+                onClick={handleDelete}
+                className="w-8 h-8 flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 rounded-lg transition-colors text-red-400"
+                title="Delete"
+              >
+                <TrashIcon />
+              </button>
+              <button 
+                onClick={onClose} 
+                className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white ml-1"
+              >
+                <CloseIcon />
+              </button>
+            </div>
           </div>
 
-          <div className="pr-28">
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
-              Invoice #{invoice.number || invoice.id}
-            </p>
-            <h2 className="text-3xl font-black text-white">{formatCurrency(invoice.grand_total)}</h2>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-500 border-2 border-white/20 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
-                {customerName.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm leading-tight">{customerName}</p>
-                {customerMobile && <p className="text-slate-400 text-xs mt-0.5">{customerMobile}</p>}
-              </div>
-              <div className="ml-auto text-right">
-                {invoiceDate && <p className="text-slate-400 text-xs">{formatDate(invoiceDate)}</p>}
-                <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
-                  {invoice.status || "PAID"}
-                </span>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-500 border-2 border-white/20 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+              {customerName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-white font-bold text-sm leading-tight truncate">{customerName}</p>
+              {customerMobile && <p className="text-slate-400 text-[10px] mt-0.5">{customerMobile}</p>}
+            </div>
+            <div className="ml-auto text-right">
+              {invoiceDate && <p className="text-slate-400 text-[10px]">{formatDate(invoiceDate)}</p>}
+              <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                {invoice.status || "PAID"}
+              </span>
             </div>
           </div>
         </div>
@@ -414,6 +442,9 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
                           ₹{Number(item.unit_price || 0).toFixed(2)} × {item.qty}
                           {Number(item.tax_rate) > 0 && <span className="ml-2 text-amber-600">+{item.tax_rate}% tax</span>}
                         </p>
+                        {item.oversold && (
+                          <p className="text-[9px] text-red-500 font-bold uppercase mt-1">⚠ Low Stock Sold</p>
+                        )}
                       </div>
                     </div>
                     <p className="font-bold text-slate-900 text-sm">{formatCurrency(Number(item.qty) * Number(item.unit_price))}</p>

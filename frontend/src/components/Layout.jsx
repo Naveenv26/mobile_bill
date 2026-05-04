@@ -9,7 +9,8 @@ import {
     Settings, 
     LogOut, 
     Star,
-    Zap
+    Zap,
+    ShieldCheck
 } from "lucide-react";
 import api from "../api/axios";
 import { logout as authLogout } from "../api/auth";
@@ -83,6 +84,10 @@ export default function Layout({ children }) {
         { name: "Stock", path: "/stock", icon: Package },
         { name: "Settings", path: "/settings", icon: Settings },
     ];
+
+    if (shopData?.role === "SITE_ADMIN") {
+        links.push({ name: "Admin OTP", path: "/admin-otp", icon: ShieldCheck });
+    }
 
     // --- Navbar Badge ---
     const getSubscriptionStatusButton = () => {

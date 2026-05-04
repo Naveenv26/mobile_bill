@@ -19,36 +19,73 @@ class NestedShopSerializer(serializers.ModelSerializer):
         fields = ['name', 'address', 'contact_phone', 'contact_email', 'language']
 
 
+import re
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError as DjangoValidationError
+
+def validate_password_strength(value):
+    """
+    8 char, 1 caps, 1 small, 1 symbol, 1 number
+    """
+    if len(value) < 8:
+        raise serializers.ValidationError("Password must be at least 8 characters long.")
+    if not re.search(r'[A-Z]', value):
+        raise serializers.ValidationError("Password must contain at least one uppercase letter.")
+    if not re.search(r'[a-z]', value):
+        raise serializers.ValidationError("Password must contain at least one lowercase letter.")
+    if not re.search(r'[0-9]', value):
+        raise serializers.ValidationError("Password must contain at least one number.")
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+        raise serializers.ValidationError("Password must contain at least one special character.")
+
 class NestedUserCreationSerializer(serializers.ModelSerializer):
-    """
-    Validates the user data (for owner and shopkeeper).
-    """
+    password = serializers.CharField(write_only=True, validators=[validate_password_strength])
+    email = serializers.EmailField(required=True)
+
     class Meta:
         model = User
         fields = ['username', 'password', 'email']
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value.lower()
 
 
 # --- Main Registration Serializer ---
 
 class ShopRegistrationSerializer(serializers.Serializer):
-    """
-    Orchestrates the registration process using nested serializers for robust validation.
-    """
     shop = NestedShopSerializer()
     owner = NestedUserCreationSerializer()
     create_shopkeeper = serializers.BooleanField(default=False)
     shopkeeper = NestedUserCreationSerializer(required=False)
 
     def validate(self, data):
+        # 1. Validate Owner
+        owner_email = data['owner']['email']
+        if User.objects.filter(email__iexact=owner_email).exists():
+             raise serializers.ValidationError({'owner': {'email': 'Email already registered.'}})
+
+        # 2. Validate Shop Phone (Anti-Trial-Abuse + OTP Check)
+        shop_phone = data['shop'].get('contact_phone')
+        
+        # Check if already registered
+        if Shop.objects.filter(contact_phone=shop_phone).exists():
+            raise serializers.ValidationError({'shop': {'contact_phone': 'This phone number is already registered.'}})
+
+        # TEMPORARILY DISABLED: Check if OTP verified
+        # from .models import PhoneVerification
+        # if not PhoneVerification.objects.filter(phone=shop_phone, is_verified=True).exists():
+        #     raise serializers.ValidationError({'shop': {'contact_phone': 'Please verify your mobile number first.'}})
+
+        # 3. Check Usernames
         if User.objects.filter(username=data['owner']['username']).exists():
-            raise serializers.ValidationError({'owner': 'An owner with this username already exists.'})
+            raise serializers.ValidationError({'owner': {'username': 'An owner with this username already exists.'}})
 
         if data.get('create_shopkeeper') and data.get('shopkeeper'):
             if User.objects.filter(username=data['shopkeeper']['username']).exists():
-                raise serializers.ValidationError({'shopkeeper': 'A shopkeeper with this username already exists.'})
+                raise serializers.ValidationError({'shopkeeper': {'username': 'A shopkeeper with this username already exists.'}})
+        
         return data
 
     @transaction.atomic

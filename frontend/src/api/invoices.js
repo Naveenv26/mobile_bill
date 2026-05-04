@@ -63,3 +63,25 @@ export const deleteInvoice = async (id) => {
   const res = await client.delete(`/invoices/${id}/`);
   return res.data;
 };
+
+// Update invoice (Edit)
+export const updateInvoice = async (id, data) => {
+  const payload = {
+    shop: data.shop,
+    customer_name: data.customer_name,
+    customer_mobile: data.customer_mobile,
+    items: data.items.map((c) => ({
+      product: c.product,
+      qty: c.qty,
+      unit_price: c.unit_price,
+      tax_rate: c.tax_rate,
+    })),
+    subtotal: data.subtotal || 0,
+    tax_total: data.tax_total || 0,
+    discount_total: data.discount_total || 0,
+    grand_total: data.grand_total,
+    payment_mode: data.payment_mode || "cash",
+  };
+  const res = await client.put(`/invoices/${id}/`, payload);
+  return res.data;
+};

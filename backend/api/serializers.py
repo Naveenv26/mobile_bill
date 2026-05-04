@@ -135,6 +135,71 @@ class InvoiceSerializer(serializers.ModelSerializer):
         )
 
     @transaction.atomic
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", [])
+        request = self.context.get('request')
+        shop = instance.shop
+        discount_amount = validated_data.get("discount_total", instance.discount_total)
+
+        # 1. Revert stock for old items
+        for old_item in instance.items.all():
+            Product.objects.filter(id=old_item.product_id).update(
+                quantity=F('quantity') + old_item.qty
+            )
+        
+        # 2. Clear old items
+        instance.items.all().delete()
+
+        # 3. Update Invoice Header
+        instance.customer_name = validated_data.get("customer_name", instance.customer_name)
+        instance.customer_mobile = validated_data.get("customer_mobile", instance.customer_mobile)
+        instance.payment_mode = validated_data.get('payment_mode', instance.payment_mode)
+        instance.discount_total = discount_amount
+
+        # Handle Customer re-association if mobile changed
+        if instance.customer_mobile:
+            customer, _ = Customer.objects.get_or_create(
+                shop=shop, mobile=instance.customer_mobile, 
+                defaults={'name': instance.customer_name, 'email': ''}
+            )
+            instance.customer = customer
+
+        # 4. Create new items and deduct stock
+        total_calc = 0
+        tax_calc = 0
+
+        for item_data in items_data:
+            prod = item_data['product']
+            qty = item_data['qty']
+            price = item_data['unit_price']
+            tax = item_data.get('tax_rate', 0)
+
+            line_total = price * qty
+            line_tax = (line_total * tax) / 100
+            
+            total_calc += line_total
+            tax_calc += line_tax
+
+            # Create the item
+            InvoiceItem.objects.create(
+                invoice=instance, product=prod, qty=qty, unit_price=price,
+                tax_rate=tax, line_total=line_total + line_tax
+            )
+
+            # Deduct stock
+            Product.objects.filter(id=prod.id).update(
+                quantity=F('quantity') - qty
+            )
+
+        # 5. Save Final Totals
+        instance.subtotal = total_calc
+        instance.tax_total = tax_calc
+        instance.grand_total = (total_calc + tax_calc) - discount_amount
+        instance.save()
+
+        return instance
+
+    @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         request = self.context.get('request')
@@ -192,8 +257,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 tax_rate=tax, line_total=line_total + line_tax
             )
 
-    # 5. Save Final Totals — apply discount sent from frontend
-            # 5. Save Final Totals
+            # ✅ Deduct stock atomically
+            Product.objects.filter(id=prod.id).update(
+                quantity=F('quantity') - qty
+            )
+
+        # 5. Save Final Totals
         invoice.subtotal = total_calc
         invoice.tax_total = tax_calc
         invoice.grand_total = (total_calc + tax_calc) - discount_amount

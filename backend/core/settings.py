@@ -182,6 +182,11 @@ RAZORPAY_KEY_SECRET = env('RAZORPAY_KEY_SECRET', default='')
 RAZORPAY_WEBHOOK_SECRET = env('RAZORPAY_WEBHOOK_SECRET', default='')
 
 # =======================================
+# Brevo (Email & SMS)
+# =======================================
+BREVO_API_KEY = env('BREVO_API_KEY', default='')
+
+# =======================================
 # CORS & CSRF
 # =======================================
 CORS_ALLOW_CREDENTIALS = True

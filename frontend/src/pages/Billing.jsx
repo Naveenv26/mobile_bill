@@ -1,8 +1,9 @@
 // frontend/src/pages/Billing.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { fetchAllProducts } from "../api/products.js";
-import { createInvoice } from "../api/invoices.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
+import { useLocation, useNavigate } from "react-router-dom";
+import { fetchAllProducts } from "../api/products.js";
+import { createInvoice, updateInvoice } from "../api/invoices.js";
 import toast from "react-hot-toast";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -59,6 +60,8 @@ export default function Billing() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [invoiceData, setInvoiceData] = useState(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editInvoiceId, setEditInvoiceId] = useState(null);
 
   const [currentShop, setCurrentShop] = useState(
     JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "", config: {} }
@@ -68,8 +71,36 @@ export default function Billing() {
   const nameRef = useRef();
   const searchRef = useRef();
 
-  // ── Android WebView flag ────────────────────────────────────────────────
-  const onAndroid = isAndroidWebView();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // ── Handle incoming EDIT state ──
+  useEffect(() => {
+    if (location.state?.editMode && location.state?.invoiceId) {
+      const { invoiceId, initialCart, initialCustomer, initialDiscount, initialPaymentMode } = location.state;
+      setIsEditMode(true);
+      setEditInvoiceId(invoiceId);
+      
+      // Load initial data
+      setCart(initialCart.map(it => ({
+        id: it.product,
+        name: it.product_name,
+        price: it.unit_price,
+        tax_rate: it.tax_rate,
+        qty: it.qty,
+        stock: 999999 // In edit mode, we temporarily ignore stock since we don't know the exact current stock vs previous sale qty yet
+      })));
+      setCustomerName(initialCustomer?.name || "");
+      setCustomerMobile(initialCustomer?.mobile || "");
+      if (initialDiscount > 0) {
+        setApplyDiscount(true);
+        // Calculate percentage for the UI if possible
+        const st = initialCart.reduce((s, it) => s + it.qty * it.unit_price, 0);
+        const p = Math.round((initialDiscount / st) * 100);
+        setDiscountPercent(p || 0);
+      }
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -139,11 +170,13 @@ export default function Billing() {
   };
 
   // ── Totals ──────────────────────────────────────────────────────────────
-  const subtotal = cart.reduce((sum, c) => sum + c.qty * c.price, 0);
-  const tax = applyTax ? cart.reduce((sum, c) => sum + (c.qty * c.price * (c.tax_rate || 0)) / 100, 0) : 0;
+  const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+  
+  const subtotal = round(cart.reduce((sum, c) => sum + c.qty * c.price, 0));
+  const tax = applyTax ? round(cart.reduce((sum, c) => sum + (c.qty * c.price * (c.tax_rate || 0)) / 100, 0)) : 0;
   const rawDiscount = applyDiscount && discountPercent > 0 ? (subtotal * discountPercent) / 100 : 0;
-  const discountAmount = Math.min(Math.max(0, rawDiscount), subtotal);
-  const total = subtotal + tax - discountAmount;
+  const discountAmount = round(Math.min(Math.max(0, rawDiscount), subtotal));
+  const total = round(subtotal + tax - discountAmount);
   const totalItems = cart.reduce((sum, c) => sum + c.qty, 0);
 
   // ── Invoice submit ──────────────────────────────────────────────────────
@@ -172,11 +205,16 @@ export default function Billing() {
         subtotal,
         tax_total: tax,
         discount_total: discountAmount,
-        total_amount: subtotal + tax,
         grand_total: total,
       };
 
-      const res = await createInvoice(payload);
+      let res;
+      if (isEditMode && editInvoiceId) {
+        res = await updateInvoice(editInvoiceId, payload);
+      } else {
+        res = await createInvoice(payload);
+      }
+      
       const responseData = res.data || res;
       const finalInvoiceData = {
         ...responseData,
@@ -188,7 +226,7 @@ export default function Billing() {
       setIsCartOpen(false);
     } catch (err) {
       console.error("Invoice Error:", err);
-      toast.error(err.response?.data?.message || "Failed to save invoice");
+      toast.error(err.response?.data?.message || "Failed to process invoice");
     }
   };
 
@@ -406,6 +444,9 @@ export default function Billing() {
     setCustomerMobile("");
     setShowSuccessModal(false);
     setInvoiceData(null);
+    setIsEditMode(false);
+    setEditInvoiceId(null);
+    navigate("/billing", { state: {}, replace: true });
     await loadProducts();
     nameRef.current?.focus();
   };
@@ -420,12 +461,14 @@ export default function Billing() {
       {/* ── Sticky Header ── */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm mt-[6px] lg:mt-0">
         <div className="px-4 py-3 flex justify-between items-center">
-          <h1 className="font-extrabold text-slate-800 text-xl tracking-tight">New Sale</h1>
+          <h1 className="font-extrabold text-slate-800 text-xl tracking-tight">
+            {isEditMode ? "Edit Sale" : "New Sale"}
+          </h1>
           <button
             onClick={resetBilling}
             className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
           >
-            Clear Form
+            {isEditMode ? "Cancel Edit" : "Clear Form"}
           </button>
         </div>
 
@@ -522,13 +565,13 @@ export default function Billing() {
                       </button>
                       <input
                         type="number"
-                        value={inCart.qty}
+                        value={inCart.qty === 0 ? "" : inCart.qty}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value);
+                          const val = e.target.value === "" ? 0 : parseInt(e.target.value);
                           if (isNaN(val)) return;
                           updateQty(inCart.id, val);
                         }}
-                        className="w-9 text-center font-extrabold text-slate-900 text-sm bg-transparent border-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-12 text-center font-extrabold text-slate-900 text-sm bg-slate-50 border-x-2 border-black focus:ring-0 focus:bg-white p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
                       />
                       <button
                         onClick={() => updateQty(inCart.id, inCart.qty + 1)}
@@ -553,7 +596,7 @@ export default function Billing() {
 
       {/* ── Floating Cart Bar ── */}
         {cart.length > 0 && !isCartOpen && (
-          <div className="fixed bottom-[110px] md:bottom-[110px] lg:bottom-[15px] left-4 right-4 lg:left-80 lg:right-8 z-30 transition-all duration-300">
+          <div className="fixed bottom-[80px] md:bottom-[80px] lg:bottom-[15px] left-4 right-4 lg:left-80 lg:right-8 z-40 transition-all duration-300">
             <button
               onClick={() => setIsCartOpen(true)}
               className="w-full max-w-5xl mx-auto bg-slate-900 text-white p-1 rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-stretch overflow-hidden active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all"
@@ -607,13 +650,13 @@ export default function Billing() {
                     </button>
                     <input
                       type="number"
-                      value={item.qty}
+                      value={item.qty === 0 ? "" : item.qty}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value);
+                        const val = e.target.value === "" ? 0 : parseInt(e.target.value);
                         if (isNaN(val)) return;
                         updateQty(item.id, val);
                       }}
-                      className="w-8 text-center font-extrabold text-slate-900 text-sm bg-transparent border-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-10 text-center font-extrabold text-slate-900 text-sm bg-slate-50 border-x-2 border-black focus:ring-0 focus:bg-white p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
                     />
                     <button onClick={() => updateQty(item.id, item.qty + 1)} className="w-8 h-8 flex items-center justify-center bg-slate-900 text-white hover:bg-slate-700 transition-colors">
                       <PlusIcon />
@@ -672,7 +715,7 @@ export default function Billing() {
                 onClick={finalizeInvoice}
                 className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-base border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all"
               >
-                Confirm Sale
+                {isEditMode ? "Update Invoice" : "Confirm Sale"}
               </button>
             </div>
           </div>
@@ -693,8 +736,12 @@ export default function Billing() {
                 </svg>
               </div>
 
-              <h2 className="text-2xl font-extrabold text-slate-800 mb-0.5">Sale Complete!</h2>
-              <p className="text-slate-400 text-sm mb-4">Invoice saved successfully</p>
+              <h2 className="text-2xl font-extrabold text-slate-800 mb-0.5">
+                {isEditMode ? "Update Complete!" : "Sale Complete!"}
+              </h2>
+              <p className="text-slate-400 text-sm mb-4">
+                {isEditMode ? "Invoice updated successfully" : "Invoice saved successfully"}
+              </p>
 
               <div className="bg-slate-50 rounded-2xl p-4 mb-5 border-2 border-black text-left">
                 <div className="text-xs text-slate-500 mb-0.5">Bill No: <span className="font-mono font-bold text-slate-700">#{invoiceData.number || invoiceData.id}</span></div>

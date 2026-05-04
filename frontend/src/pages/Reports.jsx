@@ -49,13 +49,6 @@ export default function Reports() {
     const exportMenuRef  = useRef(null);
     const currentShop    = JSON.parse(localStorage.getItem("shop")) || {};
 
-    const loadInvoices = async () => {
-        try {
-            const inv = await fetchAllInvoices();
-            setInvoices(inv);
-        } catch (e) { console.error(e); }
-    };
-
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
@@ -63,16 +56,21 @@ export default function Reports() {
                 const [inv, prod] = await Promise.all([fetchAllInvoices(), fetchAllProducts()]);
                 setInvoices(inv);
                 setProducts(prod);
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(e); 
+                toast.error("Failed to sync reports data.");
+            }
             finally { setLoading(false); }
         };
         loadData();
     }, []);
 
-    if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 text-sm animate-pulse">Loading Data...</div>;
-
-    return (
-        <div className="min-h-screen bg-[#F8FAFC] font-sans pb-24">
+    const loadInvoices = async () => {
+        try {
+            const inv = await fetchAllInvoices();
+            setInvoices(inv);
+        } catch (e) { console.error(e); }
+    };
 
     const handleExport = () => {
         if (!hasFeature("export")) return;
