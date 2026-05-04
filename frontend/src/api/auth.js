@@ -36,6 +36,12 @@ export async function registerUser(data) {
   return res.data;
 }
 
+// Check if email or mobile exists
+export async function checkAvailability(email, mobile) {
+  const res = await client.post(`/auth/check-availability/`, { email, mobile });
+  return res.data;
+}
+
 // Send OTP
 export async function sendOTP(phone) {
   const res = await client.post(`/auth/send-otp/`, { phone });

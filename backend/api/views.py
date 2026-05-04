@@ -46,6 +46,23 @@ from accounts.models import PhoneVerification
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def check_availability(request):
+    email = request.data.get('email')
+    mobile = request.data.get('mobile')
+    
+    if email:
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({"error": "This email is already registered."}, status=400)
+    
+    if mobile:
+        from shops.models import Shop
+        if Shop.objects.filter(contact_phone=mobile).exists():
+            return Response({"error": "This mobile number is already registered."}, status=400)
+            
+    return Response({"message": "Available"})
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def send_otp(request):
     phone = request.data.get('phone')
     if not phone or len(phone) != 10:

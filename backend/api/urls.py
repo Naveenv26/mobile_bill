@@ -72,6 +72,7 @@ urlpatterns = [
 
     # Auth
     path('auth/register/', ShopRegistrationView.as_view(), name='register'),
+    path('auth/check-availability/', views.check_availability, name='check_availability'),
     path('auth/send-otp/', views.send_otp, name='send_otp'),
     path('auth/verify-otp/', views.verify_otp, name='verify_otp'),
     path('auth/admin-otp-logs/', views.admin_otp_logs, name='admin_otp_logs'),
