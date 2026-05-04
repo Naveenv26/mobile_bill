@@ -51,8 +51,8 @@ def check_availability(request):
     from django.contrib.auth import get_user_model
     User = get_user_model()
     
-    email = request.data.get('email', '').strip()
-    mobile = request.data.get('mobile', '').strip()
+    email = (request.data.get('email') or '').strip()
+    mobile = (request.data.get('mobile') or '').strip()
     
     if email:
         if User.objects.filter(email__iexact=email).exists():
