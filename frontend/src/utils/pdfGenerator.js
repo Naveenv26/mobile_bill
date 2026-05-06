@@ -122,7 +122,8 @@ export const generateThermalPDF = async (printData, currentShop) => {
     doc.text(new Date(baseDate).toLocaleDateString("en-GB"), rx, cur, { align: "right" });
     cur += 5;
     if (cMobile) doc.text(`Mob: ${cMobile}`, lx, cur);
-    doc.text(`Bill No: #${printData.number || printData.id || "N/A"}`, rx, cur, { align: "right" });
+    const isQuote = printData.invoice_type === 'QUOTATION';
+    doc.text(`${isQuote ? "Quote" : "Bill"} No: #${printData.number || printData.id || "N/A"}`, rx, cur, { align: "right" });
     cur += 4;
 
     // Items table

@@ -196,9 +196,16 @@ export default function Layout({ children }) {
                                 <p className="text-sm font-semibold text-slate-800 max-w-[120px] truncate">{shopName}</p>
                                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Owner</p>
                             </div>
-                            <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 p-0.5 flex items-center justify-center overflow-hidden">
-                                {shopData?.logo ? (
-                                    <img src={shopData.logo} alt={shopName} className="w-full h-full object-cover rounded-full" />
+                            <div 
+                                onClick={() => navigate("/settings")}
+                                className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 p-0.5 flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all"
+                            >
+                                {shopData?.config?.logo_base64 || shopData?.logo ? (
+                                    <img 
+                                        src={shopData.config?.logo_base64 || shopData.logo} 
+                                        alt="Logo" 
+                                        className="w-full h-full object-contain" 
+                                    />
                                 ) : (
                                     <span className="text-sm font-bold text-indigo-600">{shopName.charAt(0)}</span>
                                 )}
@@ -208,12 +215,12 @@ export default function Layout({ children }) {
                 </header>
 
                 {/* Page Scrollable Area */}
-                <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 pb-24 lg:pb-6 p-4 sm:p-6">
+                <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 pb-24 lg:pb-6 p-2 sm:p-6">
                     {children}
                 </main>
 
                 {/* Bottom Navigation (Mobile Only) */}
-                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-2 z-50 pb-safe">
+                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-3 py-2 z-50 pb-safe">
                     <div className="flex items-center justify-between">
                         {/* FIX: Removed .filter() here as well */}
                         {links.map((link) => {

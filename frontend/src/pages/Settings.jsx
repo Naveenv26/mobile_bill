@@ -163,18 +163,18 @@ export default function Settings() {
   if (isMobile && !activeTab) {
      return (
         <div className="min-h-screen bg-slate-50 pb-24">
-          <div className="bg-white px-4 py-4 border-b border-slate-200 sticky top-0 z-10">
-            <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+          <div className="bg-white px-3 py-3 border-b border-slate-200 sticky top-0 z-10">
+            <h1 className="text-xl font-bold text-slate-900">Settings</h1>
           </div>
           
           <div className="divide-y divide-slate-100 bg-white mt-2 border-t border-b border-slate-200">
             {tabs.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 text-left active:bg-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="text-slate-500">{tab.icon}</div>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 text-left active:bg-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="text-slate-500 scale-90">{tab.icon}</div>
                   <div>
-                    <div className="text-base font-medium text-slate-900">{tab.label}</div>
-                    <div className="text-xs text-slate-500">{tab.desc}</div>
+                    <div className="text-sm font-bold text-slate-800">{tab.label}</div>
+                    <div className="text-[10px] text-slate-500 leading-tight">{tab.desc}</div>
                   </div>
                 </div>
                 <Icons.ChevronRight />
@@ -204,9 +204,9 @@ export default function Settings() {
   if (isMobile && activeTab) {
       return (
           <div className="min-h-screen bg-slate-50 flex flex-col">
-            <div className="bg-white px-4 py-3 border-b border-slate-200 sticky top-0 z-20 flex items-center gap-3 shadow-sm">
-              <button onClick={() => setActiveTab(null)} className="p-1 -ml-2 rounded-full hover:bg-slate-100 text-slate-600"><Icons.ArrowLeft /></button>
-              <h2 className="text-lg font-bold text-slate-900 truncate">{tabs.find(t => t.id === activeTab)?.label}</h2>
+            <div className="bg-white px-3 py-2.5 border-b border-slate-200 sticky top-0 z-20 flex items-center gap-2 shadow-sm">
+              <button onClick={() => setActiveTab(null)} className="p-1 -ml-1 rounded-full hover:bg-slate-100 text-slate-600"><Icons.ArrowLeft /></button>
+              <h2 className="text-base font-bold text-slate-900 truncate">{tabs.find(t => t.id === activeTab)?.label}</h2>
             </div>
             <div className="flex-1 p-4 overflow-y-auto pb-24">{renderContent()}</div>
           </div>

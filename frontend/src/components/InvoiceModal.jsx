@@ -86,21 +86,23 @@ const buildThermalDoc = (invoice, shop, logoBase64 = null) => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, fy] });
   let cur = 4;
 
-  // Logo top-left
+  // Shop name and Logo on the same line
   if (logoBase64) {
     try {
       const img = new Image(); img.src = logoBase64;
       const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1);
       LOGO_W = Math.min(16, 16 * ratio); LOGO_H = LOGO_W / ratio;
       if (LOGO_H > 16) { LOGO_H = 16; LOGO_W = LOGO_H * ratio; }
-      doc.addImage(logoBase64, "PNG", lx, cur, LOGO_W, LOGO_H);
-      cur += LOGO_H + 3;
+      doc.addImage(logoBase64, "PNG", rx - LOGO_W, cur, LOGO_W, LOGO_H);
     } catch { /* skip */ }
   }
 
   // Shop name — BOLD LEFT
   doc.setFontSize(10); doc.setFont("helvetica", "bold");
-  doc.text(shop?.name || "Shop", lx, cur); cur += 5;
+  doc.text(shop?.name || "Shop", lx, cur + 5); 
+  
+  // Advance 'cur' by the height of the logo or shop name
+  cur += Math.max(LOGO_H, 10) + 2; 
 
   // Address / phone / email — LEFT
   doc.setFontSize(7); doc.setFont("helvetica", "normal");
@@ -199,9 +201,11 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
   const lineY = Math.max(addrY + 2, headerStartY + 30);
   doc.setDrawColor(200, 200, 200); doc.line(margin, lineY, pageW - margin, lineY);
 
-  // INVOICE label on right, just above the line
-  doc.setFontSize(20); doc.setFont("helvetica", "bold"); doc.setTextColor(40, 40, 40);
-  doc.text("INVOICE", pageW - margin, lineY - 5, { align: "right" });
+  // INVOICE / QUOTATION label on right, just above the line
+  const isQuote = invoice.invoice_type === 'QUOTATION';
+  doc.setFontSize(20); doc.setFont("helvetica", "bold"); 
+  doc.setTextColor(isQuote ? [245, 158, 11] : [40, 40, 40]);
+  doc.text(isQuote ? "QUOTATION" : "INVOICE", pageW - margin, lineY - 5, { align: "right" });
 
   // Bill To + invoice meta
   const startY = lineY + 12;
@@ -214,7 +218,7 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
   doc.setFont("helvetica", "normal"); doc.setFontSize(9);
   doc.text(cName, margin, startY + 6);
   if (cMobile) doc.text(cMobile, margin, startY + 12);
-  doc.text(`Invoice No: ${invoice.number || invoice.id}`, pageW - margin, startY, { align: "right" });
+  doc.text(`${isQuote ? "Quote" : "Invoice"} No: ${invoice.number || invoice.id}`, pageW - margin, startY, { align: "right" });
   doc.text(`Date: ${new Date(baseDate).toLocaleDateString()}`, pageW - margin, startY + 6, { align: "right" });
 
   // Items table
@@ -370,9 +374,11 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">
-                Invoice #{invoice.number || invoice.id}
+                {invoice.invoice_type || "Invoice"} #{invoice.number || invoice.id}
               </p>
-              <h2 className="text-3xl font-black text-white leading-none">{formatCurrency(invoice.grand_total)}</h2>
+              <h2 className={`text-3xl font-black leading-none ${invoice.invoice_type === "QUOTATION" ? "text-amber-400" : "text-white"}`}>
+                {formatCurrency(invoice.grand_total)}
+              </h2>
             </div>
             <div className="flex items-center gap-1.5">
               <button

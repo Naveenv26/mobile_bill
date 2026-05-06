@@ -76,9 +76,9 @@ export default function ShopSetup() {
     <div className="flex justify-center items-center min-h-[80vh] bg-gray-50">
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-2xl shadow-md w-[90%] max-w-md"
+        className="bg-white p-6 sm:p-8 rounded-2xl shadow-md w-[95%] max-w-md"
       >
-        <h1 className="text-2xl font-semibold mb-6 text-center">
+        <h1 className="text-xl sm:text-2xl font-bold mb-6 text-center text-slate-800">
           Setup Your Shop
         </h1>
 
@@ -110,7 +110,7 @@ export default function ShopSetup() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+          className="w-full bg-slate-900 text-white py-3 rounded-xl hover:bg-slate-800 font-bold shadow-lg transition-all"
         >
           {loading ? "Setting up..." : "Create Shop"}
         </button>

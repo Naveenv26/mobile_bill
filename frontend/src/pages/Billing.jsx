@@ -62,6 +62,7 @@ export default function Billing() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editInvoiceId, setEditInvoiceId] = useState(null);
+  const [invoiceType, setInvoiceType] = useState("INVOICE");
 
   const [currentShop, setCurrentShop] = useState(
     JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "", config: {} }
@@ -80,6 +81,7 @@ export default function Billing() {
       const { invoiceId, initialCart, initialCustomer, initialDiscount, initialPaymentMode } = location.state;
       setIsEditMode(true);
       setEditInvoiceId(invoiceId);
+      setInvoiceType(location.state?.invoiceType || "INVOICE");
       
       // Load initial data
       setCart(initialCart.map(it => ({
@@ -134,9 +136,15 @@ export default function Billing() {
     const inCart = cart.find((c) => c.id === p.id);
     const currentQty = inCart ? inCart.qty : 0;
     
-    if (currentQty + 1 > p.stock) {
-      toast.error(`Out of stock! Only ${p.stock} available.`);
+    const allowNegative = currentShop?.config?.inventory?.allowNegative ?? false;
+
+    if (currentQty + 1 > p.stock && !allowNegative) {
+      toast.error("Product out of stock!");
       return;
+    }
+
+    if (currentQty + 1 > p.stock) {
+      toast("Selling from negative stock!", { icon: "⚠" });
     }
 
     setCart((prev) => {
@@ -161,12 +169,20 @@ export default function Billing() {
     if (newQty <= 0) { setCart((prev) => prev.filter((c) => c.id !== id)); return; }
     setCart((prev) => {
       const item = prev.find((c) => c.id === id);
-      if (item && newQty > item.stock) {
-        toast.error(`Out of stock! Only ${item.stock} available.`);
+      const allowNegative = currentShop?.config?.inventory?.allowNegative ?? false;
+      if (item && newQty > item.stock && !allowNegative) {
+        toast.error("Cannot exceed available stock.");
         return prev;
+      }
+      if (item && newQty > item.stock) {
+        toast("Selling from negative stock!", { icon: "⚠" });
       }
       return prev.map((c) => (c.id === id ? { ...c, qty: newQty } : c));
     });
+  };
+
+  const updatePrice = (id, newPrice) => {
+    setCart((prev) => prev.map((c) => (c.id === id ? { ...c, price: newPrice } : c)));
   };
 
   // ── Totals ──────────────────────────────────────────────────────────────
@@ -184,12 +200,7 @@ export default function Billing() {
     if (!cart.length) return toast.error("Cart is empty");
     if (typeof hasFeature === "function" && !hasFeature("billing")) return toast.error("Upgrade plan required.");
 
-    // Final stock check before submission
-    for (const item of cart) {
-      if (item.qty > item.stock) {
-        return toast.error(`Stock exceeded for ${item.name}. Max: ${item.stock}`);
-      }
-    }
+    // Stock check removed to allow negative billing
 
     try {
       const payload = {
@@ -206,6 +217,7 @@ export default function Billing() {
         tax_total: tax,
         discount_total: discountAmount,
         grand_total: total,
+        invoice_type: invoiceType,
       };
 
       let res;
@@ -460,39 +472,60 @@ export default function Billing() {
 
       {/* ── Sticky Header ── */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm mt-[6px] lg:mt-0">
-        <div className="px-4 py-3 flex justify-between items-center">
-          <h1 className="font-extrabold text-slate-800 text-xl tracking-tight">
+        <div className="px-3 py-3 flex justify-between items-center">
+          <h1 className="font-extrabold text-slate-800 text-lg tracking-tight truncate">
             {isEditMode ? "Edit Sale" : "New Sale"}
           </h1>
           <button
             onClick={resetBilling}
-            className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
+            className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1.5 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
           >
-            {isEditMode ? "Cancel Edit" : "Clear Form"}
+            {isEditMode ? "Cancel" : "Clear"}
           </button>
         </div>
 
+        {/* --- Document Type Selection (Dropdown) --- */}
+        <div className="px-3 pb-2">
+          <div className="relative">
+            <select
+              value={invoiceType}
+              onChange={(e) => setInvoiceType(e.target.value)}
+              className={`
+                w-full appearance-none bg-white border-2 border-black rounded-xl px-4 py-2.5 text-sm font-bold uppercase tracking-tight shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all
+                ${invoiceType === "QUOTATION" ? "text-amber-600 border-amber-500" : "text-indigo-600 border-indigo-500"}
+              `}
+            >
+              <option value="INVOICE">📄 Sales Invoice</option>
+              <option value="QUOTATION">📝 Quotation / Estimate</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
+              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
         <div className="px-4 pb-2">
-          <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-full">
             <input
               ref={nameRef}
               type="text"
-              placeholder="Customer Name"
+              placeholder="Name"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="flex-grow bg-white border-none rounded-xl px-3 py-2.5 text-sm font-medium placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 shadow-sm min-w-0"
+              className="flex-grow bg-white border-none rounded-xl px-2.5 py-2 text-sm font-medium placeholder:text-[10px] sm:placeholder:text-sm focus:ring-2 focus:ring-indigo-500 shadow-sm min-w-0"
             />
             <input
               type="tel"
               placeholder="Mobile"
               value={customerMobile}
               onChange={(e) => setCustomerMobile(e.target.value)}
-              className="w-28 bg-white border-none rounded-xl px-3 py-2.5 text-sm font-medium placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              className="w-24 bg-white border-none rounded-xl px-2.5 py-2 text-sm font-medium placeholder:text-[10px] sm:placeholder:text-sm focus:ring-2 focus:ring-indigo-500 shadow-sm"
             />
           </div>
         </div>
 
-        <div className="px-4 pb-3">
+        <div className="px-3 pb-3">
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-indigo-500">
               <SearchIcon />
@@ -507,10 +540,9 @@ export default function Billing() {
             />
           </div>
         </div>
-      </div>
 
       {/* ── Product Grid ── */}
-      <div className="px-4 py-3 max-w-7xl mx-auto">
+      <div className="px-3 py-3 max-w-7xl mx-auto">
         {filteredProducts.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-slate-400 text-sm">
             No products found
@@ -527,39 +559,45 @@ export default function Billing() {
               return (
                 <div
                   key={p.id}
-                  onClick={() => !outOfStock && addToCart(p)}
+                  onClick={() => addToCart(p)}
                   className={`
-                    bg-white rounded-2xl border-2 border-black
-                    px-4 py-3 flex items-center gap-3
-                    shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
-                    active:shadow-none active:translate-x-[2px] active:translate-y-[2px]
-                    transition-all duration-100 cursor-pointer select-none
-                    ${isInitiallyOutOfStock ? "opacity-50 cursor-not-allowed" : ""}
-                    ${inCart ? "bg-indigo-50 border-indigo-600 shadow-[2px_2px_0px_0px_rgba(79,70,229,1)]" : ""}
+                    group relative overflow-hidden
+                    bg-white rounded-2xl p-3 flex items-center gap-2.5
+                    border border-slate-100 shadow-sm
+                    active:scale-[0.97]
+                    transition-all duration-200 cursor-pointer select-none
+                    ${isInitiallyOutOfStock ? "bg-amber-50/30" : ""}
+                    ${inCart ? "ring-2 ring-indigo-500 bg-indigo-50/50 shadow-indigo-100" : "hover:border-indigo-200 hover:shadow-md"}
                   `}
                 >
+                  {/* Subtle Glow Background for In-Cart */}
+                  {inCart && (
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full -translate-y-12 translate-x-12 blur-2xl pointer-events-none" />
+                  )}
                   {/* Left: Name + stock */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900 text-sm leading-tight truncate">{p.name}</p>
-                    <span className={`text-[10px] font-bold tracking-wide ${remainingStock > 0 ? "text-green-600" : "text-red-500"}`}>
-                      {remainingStock > 0 ? `${remainingStock} in stock` : "Out of stock"}
-                    </span>
+                  <div className="flex-1 min-w-0 relative z-10">
+                    <p className="font-bold text-slate-800 text-sm leading-tight truncate">{p.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${remainingStock > 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+                        {remainingStock > 0 ? `${remainingStock} left` : `Stock: ${remainingStock}`}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Price */}
-                  <div className={`font-extrabold text-sm px-2.5 py-1 rounded-lg border border-black flex-shrink-0 ${inCart ? "bg-indigo-600 text-white border-indigo-600" : "bg-slate-100 text-slate-900"}`}>
+                  <div className="text-sm font-black text-slate-900 mr-2">
                     ₹{p.price}
                   </div>
 
                   {/* Qty controls or + button */}
                   {inCart ? (
                     <div
-                      className="flex items-center bg-white rounded-xl border-2 border-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] flex-shrink-0"
+                      className="flex items-center bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0 relative z-10"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         onClick={() => updateQty(inCart.id, inCart.qty - 1)}
-                        className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 rounded-l-xl transition-colors active:bg-slate-200"
+                        className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors"
                       >
                         {inCart.qty === 1 ? <TrashIcon /> : <MinusIcon />}
                       </button>
@@ -571,11 +609,11 @@ export default function Billing() {
                           if (isNaN(val)) return;
                           updateQty(inCart.id, val);
                         }}
-                        className="w-12 text-center font-extrabold text-slate-900 text-sm bg-slate-50 border-x-2 border-black focus:ring-0 focus:bg-white p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                        className="w-9 text-center font-black text-slate-900 text-xs bg-slate-50/50 border-x border-slate-100 focus:ring-0 focus:bg-white p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
                       />
                       <button
                         onClick={() => updateQty(inCart.id, inCart.qty + 1)}
-                        className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-100 rounded-r-xl transition-colors active:bg-slate-200"
+                        className="w-8 h-8 flex items-center justify-center bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                       >
                         <PlusIcon />
                       </button>
@@ -620,14 +658,14 @@ export default function Billing() {
 
       {/* ── Cart Drawer ── */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm pb-16 sm:pb-0">
-          <div className="bg-white w-full sm:w-[500px] sm:rounded-2xl rounded-t-3xl shadow-2xl border-2 border-black max-h-[88vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm pb-16 sm:pb-0">
+          <div className="bg-white w-full sm:w-[500px] sm:rounded-3xl rounded-t-[2.5rem] shadow-2xl max-h-[88vh] flex flex-col border-t border-slate-100 sm:border-none">
             {/* Drag handle (mobile) */}
             <div className="w-full flex justify-center pt-3 pb-1 sm:hidden cursor-pointer" onClick={() => setIsCartOpen(false)}>
               <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
             </div>
 
-            <div className="px-5 py-4 border-b-2 border-black flex justify-between items-center">
+            <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
               <div>
                 <h2 className="text-lg font-extrabold text-slate-800">Current Bill</h2>
                 <p className="text-xs text-slate-400 font-medium">Review before checkout</p>
@@ -637,15 +675,24 @@ export default function Billing() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {cart.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5">
+                <div key={item.id} className="flex items-center gap-2.5 bg-slate-50/80 rounded-2xl border border-slate-100 p-2.5 transition-all">
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-800 text-sm truncate">{item.name}</p>
-                    <p className="text-xs text-slate-500">₹{item.price} / unit</p>
+                    <p className="font-extrabold text-slate-800 text-[13px] leading-tight truncate">{item.name}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Price:</span>
+                      <input 
+                        type="number"
+                        value={item.price}
+                        onChange={(e) => updatePrice(item.id, parseFloat(e.target.value) || 0)}
+                        className="w-14 bg-white border-b border-dashed border-indigo-200 focus:border-indigo-500 focus:ring-0 p-0 text-[11px] font-black text-indigo-600 rounded-sm px-1"
+                        title="Manual Price Edit"
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center border-2 border-black rounded-xl overflow-hidden flex-shrink-0">
-                    <button onClick={() => updateQty(item.id, item.qty - 1)} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition-colors">
+                  <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                    <button onClick={() => updateQty(item.id, item.qty - 1)} className="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors">
                       {item.qty === 1 ? <TrashIcon /> : <MinusIcon />}
                     </button>
                     <input
@@ -656,13 +703,13 @@ export default function Billing() {
                         if (isNaN(val)) return;
                         updateQty(item.id, val);
                       }}
-                      className="w-10 text-center font-extrabold text-slate-900 text-sm bg-slate-50 border-x-2 border-black focus:ring-0 focus:bg-white p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                      className="w-8 text-center font-black text-slate-900 text-xs bg-slate-50/30 border-x border-slate-100 focus:ring-0 p-0 [appearance:textfield] transition-colors"
                     />
-                    <button onClick={() => updateQty(item.id, item.qty + 1)} className="w-8 h-8 flex items-center justify-center bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                    <button onClick={() => updateQty(item.id, item.qty + 1)} className="w-7 h-7 flex items-center justify-center bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
                       <PlusIcon />
                     </button>
                   </div>
-                  <span className="font-bold text-slate-900 text-sm w-14 text-right flex-shrink-0">
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm w-12 text-right flex-shrink-0">
                     ₹{(item.qty * item.price).toFixed(0)}
                   </span>
                 </div>
@@ -694,28 +741,31 @@ export default function Billing() {
             </div>
 
             {/* Totals + Checkout */}
-            <div className="p-5 bg-slate-50 border-t-2 border-black sm:rounded-b-2xl">
-              <div className="space-y-1.5 mb-4">
-                <div className="flex justify-between text-sm text-slate-500"><span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
+            <div className="p-6 bg-slate-50/50 border-t border-slate-100 sm:rounded-b-3xl">
+              <div className="space-y-2 mb-6">
+                <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider"><span>Subtotal</span><span>₹{subtotal.toFixed(0)}</span></div>
                 {applyTax && tax > 0 && (
                   <>
-                    <div className="flex justify-between text-xs text-slate-400 pl-2"><span>CGST</span><span>₹{(tax / 2).toFixed(2)}</span></div>
-                    <div className="flex justify-between text-xs text-slate-400 pl-2"><span>SGST</span><span>₹{(tax / 2).toFixed(2)}</span></div>
+                    <div className="flex justify-between text-[11px] text-slate-400 pl-2"><span>CGST (9%)</span><span>₹{(tax / 2).toFixed(2)}</span></div>
+                    <div className="flex justify-between text-[11px] text-slate-400 pl-2"><span>SGST (9%)</span><span>₹{(tax / 2).toFixed(2)}</span></div>
                   </>
                 )}
-                <div className="flex justify-between text-sm text-slate-500"><span>Total Tax</span><span>+₹{tax.toFixed(2)}</span></div>
-                {applyDiscount && discountAmount > 0 && (
-                  <div className="flex justify-between text-sm font-bold text-emerald-600"><span>Discount (-{discountPercent}%)</span><span>-₹{discountAmount.toFixed(2)}</span></div>
+                {tax > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-slate-500"><span>Total Tax</span><span>+₹{tax.toFixed(2)}</span></div>
                 )}
-                <div className="flex justify-between text-xl font-extrabold text-slate-900 pt-2 border-t-2 border-black">
-                  <span>Total</span><span>₹{total.toFixed(2)}</span>
+                {applyDiscount && discountAmount > 0 && (
+                  <div className="flex justify-between text-sm font-black text-emerald-600"><span>Discount ({discountPercent}%)</span><span>-₹{discountAmount.toFixed(0)}</span></div>
+                )}
+                <div className="flex justify-between items-end pt-3 border-t border-slate-200">
+                  <span className="text-sm font-bold text-slate-500 mb-1">Grand Total</span>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight leading-none">₹{total.toFixed(0)}</span>
                 </div>
               </div>
               <button
                 onClick={finalizeInvoice}
-                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-base border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all"
+                className={`w-full py-4 rounded-2xl font-black text-lg text-white shadow-xl transition-all active:scale-[0.98] ${invoiceType === "QUOTATION" ? "bg-amber-500 shadow-amber-200/50 hover:bg-amber-600" : "bg-indigo-600 shadow-indigo-200/50 hover:bg-indigo-700"}`}
               >
-                {isEditMode ? "Update Invoice" : "Confirm Sale"}
+                {isEditMode ? "Update" : "Confirm"} {invoiceType === "QUOTATION" ? "Quotation" : "Sale"}
               </button>
             </div>
           </div>
@@ -724,13 +774,11 @@ export default function Billing() {
 
       {/* ── Success Modal ── */}
       {showSuccessModal && invoiceData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-7 text-center shadow-2xl border-2 border-black relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-28 h-28 bg-green-50 rounded-full -translate-x-10 -translate-y-10 z-0" />
-            <div className="absolute bottom-0 right-0 w-20 h-20 bg-indigo-50 rounded-full translate-x-8 translate-y-8 z-0" />
-
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl relative overflow-hidden border border-slate-100">
+            <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-50/50 rounded-full -translate-x-12 -translate-y-12 z-0 blur-2xl" />
+            
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-black">
                 <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
@@ -780,7 +828,7 @@ export default function Billing() {
                 </button>
               </div>
             </div>
-          </div>
+  
         </div>
       )}
     </div>

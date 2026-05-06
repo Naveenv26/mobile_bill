@@ -9,12 +9,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  // OTP State
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otp, setOtp] = useState("");
-
+  // Password visibility
   const [showPassword, setShowPassword] = useState(false);
 
   // Form data state
@@ -30,38 +25,7 @@ export default function Login() {
   const handleChange = (e) =>
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
-  const handleSendOTP = async () => {
-    if (form.mobile.length !== 10) return;
-    setOtpLoading(true);
-    setError("");
-    try {
-      // First, check if this mobile is already registered
-      await checkAvailability(null, form.mobile);
-      
-      // If available, proceed with bypass (Mocking successful send and auto-verifying)
-      setOtpSent(true);
-      setOtpVerified(true); 
-      toast.success("Mobile number accepted!");
-    } catch (err) {
-      toast.error(err.response?.data?.error || "This mobile number is already taken.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) return;
-    setOtpLoading(true);
-    try {
-      await verifyOTP(form.mobile, otp);
-      setOtpVerified(true);
-      toast.success("Mobile verified!");
-    } catch (err) {
-      toast.error("Invalid OTP. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
+  // OTP functions removed
 
   // Helper to extract error messages from Django API
   const getErrorMessage = (err) => {
@@ -130,8 +94,8 @@ export default function Login() {
   // ---------- SIGNUP (Step 2) ----------
   const handleSignupStep2 = async (e) => {
     e.preventDefault();
-    if (!otpVerified) {
-      return toast.error("Please verify your mobile number first.");
+    if (form.mobile.length !== 10) {
+      return toast.error("Please enter a valid 10-digit mobile number.");
     }
     
     setLoading(true);
@@ -176,15 +140,15 @@ export default function Login() {
   const pwdStatus = validatePassword(form.password);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-3 sm:p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
         
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            <img src="/sparkbill-logo.png" alt="SparkBill" className="h-10 w-auto object-contain mx-auto" />
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            <img src="/sparkbill-logo.png" alt="SparkBill" className="h-8 sm:h-10 w-auto object-contain mx-auto" />
           </h1>
-          <p className="text-sm text-slate-500 mt-2 font-medium">
+          <p className="text-[11px] sm:text-sm text-slate-500 mt-1.5 sm:mt-2 font-medium">
             {view === "login" && "Login to manage your shop"}
             {view === "signup" && "Create your shop account"}
             {view === "forgot" && "Reset your password"}
@@ -259,12 +223,12 @@ export default function Login() {
               {loading ? "Signing In..." : "Sign In"}
             </button>
 
-            <div className="text-center mt-6">
-              <span className="text-slate-500 text-sm">New here? </span>
+            <div className="text-center mt-4 sm:mt-6">
+              <span className="text-slate-500 text-xs sm:text-sm">New here? </span>
               <button
                 type="button"
                 onClick={() => { setView("signup"); setStep(1); setError(""); setMessage(""); }}
-                className="text-indigo-600 font-bold text-sm hover:underline"
+                className="text-indigo-600 font-bold text-xs sm:text-sm hover:underline"
               >
                 Create Account
               </button>
@@ -357,58 +321,20 @@ export default function Login() {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">10-Digit Mobile Number</label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            name="mobile"
-                            type="tel"
-                            maxLength="10"
-                            value={form.mobile}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, "");
-                              setForm(p => ({ ...p, mobile: val }));
-                            }}
-                            disabled={otpVerified}
-                            className={`w-full p-3 bg-white border ${otpVerified ? "border-green-500 bg-green-50" : "border-slate-200"} rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-colors`}
-                            placeholder="9876543210"
-                            required
-                          />
-                          {otpVerified && <span className="absolute right-3 top-3 text-green-600 font-bold text-xs flex items-center gap-1"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" /></svg> Verified</span>}
-                        </div>
-                        {!otpVerified && (
-                          <button
-                            type="button"
-                            onClick={handleSendOTP}
-                            disabled={form.mobile.length !== 10 || otpLoading}
-                            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl disabled:opacity-50 active:scale-95 transition-all"
-                          >
-                            {otpSent ? "Resend" : "Send OTP"}
-                          </button>
-                        )}
-                      </div>
+                      <input
+                        name="mobile"
+                        type="tel"
+                        maxLength="10"
+                        value={form.mobile}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "");
+                          setForm(p => ({ ...p, mobile: val }));
+                        }}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="9876543210"
+                        required
+                      />
                     </div>
-
-                    {otpSent && !otpVerified && (
-                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Enter 6-Digit OTP</label>
-                        <div className="flex gap-2">
-                          <input
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value.substring(0,6))}
-                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-center font-bold tracking-[0.5em] text-lg"
-                            placeholder="000000"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleVerifyOTP}
-                            disabled={otp.length !== 6 || otpLoading}
-                            className="px-6 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"
-                          >
-                            Verify
-                          </button>
-                        </div>
-                      </div>
-                    )}
 
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Shop Address</label>
@@ -428,7 +354,7 @@ export default function Login() {
                   <button type="button" onClick={() => setStep(1)} className="flex-1 py-3.5 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition">
                     Back
                   </button>
-                  <button disabled={loading || !otpVerified} className="flex-[2] py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 disabled:opacity-70 disabled:cursor-not-allowed">
+                  <button disabled={loading} className="flex-[2] py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 disabled:opacity-70 disabled:cursor-not-allowed">
                     {loading ? "Registering..." : "Complete Setup"}
                   </button>
                 </div>

@@ -87,7 +87,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-50 pb-10 font-sans">
 
       {/* Dark wallet header */}
-      <div className="relative bg-slate-900 pt-10 pb-24 px-6 rounded-b-[2.5rem] shadow-2xl shadow-slate-900/20 overflow-hidden">
+      <div className="relative bg-slate-900 pt-8 pb-20 px-4 sm:px-6 rounded-b-[2.5rem] shadow-2xl shadow-slate-900/20 overflow-hidden">
         <div className="flex justify-between items-start mb-2">
           <div>
             <p className="text-slate-400 text-xs uppercase tracking-widest font-semibold">Total Revenue</p>
@@ -97,9 +97,9 @@ export default function Dashboard() {
                 {totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </h1>
             </div>
-            <p className="text-slate-500 text-xs mt-2">
+            <p className="text-slate-500 text-[10px] sm:text-xs mt-2">
               Today: <span className="text-emerald-400 font-bold">₹{todaySales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
-              <span className="ml-3 text-slate-600">{allInvoices.length} total invoices</span>
+              <span className="ml-2 text-slate-600">{allInvoices.length} total</span>
             </p>
           </div>
           <div className="bg-slate-800 p-2 rounded-full">
@@ -118,41 +118,41 @@ export default function Dashboard() {
       </div>
 
       {/* Floating stat cards */}
-      <div className="mx-4 sm:mx-6 -mt-16 bg-white rounded-3xl shadow-xl shadow-slate-200/60 relative z-10">
+      <div className="mx-3 sm:mx-6 -mt-12 bg-white rounded-3xl shadow-xl shadow-slate-200/60 relative z-10">
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
-          <div className="p-5 border-b sm:border-b-0 border-slate-100 text-center">
-            <p className="text-xs text-slate-400 font-medium mb-1">Total Invoices</p>
-            <div className="flex items-center justify-center gap-2">
-              <DocumentTextIcon className="w-5 h-5 text-blue-600" />
-              <span className="text-xl font-bold text-slate-800">{allInvoices.length}</span>
+          <div className="p-3 border-b sm:border-b-0 border-slate-100 text-center">
+            <p className="text-[10px] text-slate-400 font-medium mb-1 truncate">Invoices</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <DocumentTextIcon className="w-4 h-4 text-blue-600" />
+              <span className="text-base font-bold text-slate-800">{allInvoices.length}</span>
             </div>
           </div>
-          <div className="p-5 border-b sm:border-b-0 border-slate-100 text-center">
-            <p className="text-xs text-slate-400 font-medium mb-1">Products</p>
-            <div className="flex items-center justify-center gap-2">
-              <CubeIcon className="w-5 h-5 text-purple-600" />
-              <span className="text-xl font-bold text-slate-800">{products.length}</span>
+          <div className="p-3 border-b sm:border-b-0 border-slate-100 text-center">
+            <p className="text-[10px] text-slate-400 font-medium mb-1 truncate">Products</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <CubeIcon className="w-4 h-4 text-purple-600" />
+              <span className="text-base font-bold text-slate-800">{products.length}</span>
             </div>
           </div>
-          <div className="p-5 text-center">
-            <p className="text-xs text-slate-400 font-medium mb-1">Low Stock</p>
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-              <span className="text-lg font-semibold text-slate-700">{lowStock} Items</span>
+          <div className="p-3 text-center border-slate-100">
+            <p className="text-[10px] text-slate-400 font-medium mb-1 truncate">Low Stock</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+              <span className="text-sm font-semibold text-slate-700">{lowStock}</span>
             </div>
           </div>
-          <div className="p-5 text-center">
-            <p className="text-xs text-slate-400 font-medium mb-1">Out of Stock</p>
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              <span className="text-lg font-semibold text-slate-700">{outOfStock} Items</span>
+          <div className="p-3 text-center">
+            <p className="text-[10px] text-slate-400 font-medium mb-1 truncate">Out of Stock</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+              <span className="text-sm font-semibold text-slate-700">{outOfStock}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Recent Sales */}
-      <div className="mt-8 px-4 sm:px-6">
+      <div className="mt-6 px-3 sm:px-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-slate-800 font-bold text-lg">Recent Sales</h2>
@@ -176,29 +176,29 @@ export default function Dashboard() {
                 <div
                   key={inv.id}
                   onClick={() => setSelectedInvoice(inv)}
-                  className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-95 transition-all cursor-pointer hover:border-indigo-200 hover:shadow-md"
+                  className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-100 shadow-sm active:scale-95 transition-all cursor-pointer hover:border-indigo-200 hover:shadow-md"
                 >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${index % 2 === 0 ? "bg-blue-50 text-blue-600" : "bg-indigo-50 text-indigo-600"}`}>
-                      <span className="text-sm font-bold">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${index % 2 === 0 ? "bg-blue-50 text-blue-600" : "bg-indigo-50 text-indigo-600"}`}>
+                      <span className="text-xs font-bold">
                         {(inv.customer_detail?.name?.[0] || inv.customer_name?.[0] || "C").toUpperCase()}
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-bold text-slate-800 truncate">
+                      <h3 className="text-xs font-bold text-slate-800 truncate">
                         {inv.customer_detail?.name || inv.customer_name || "Walk-in"}
                       </h3>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                         {new Date(inv.created_at || inv.invoice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                         <span className="mx-1">•</span>#{inv.number || inv.id}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0 ml-3">
-                    <span className="block text-sm font-bold text-slate-800">
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <span className="block text-xs font-bold text-slate-800">
                       +₹{Math.floor(Number(inv.grand_total || 0)).toLocaleString("en-IN")}
                     </span>
-                    <span className="text-[9px] text-indigo-400 font-bold">VIEW →</span>
+                    <span className="text-[8px] text-indigo-400 font-bold">VIEW →</span>
                   </div>
                 </div>
               ))}

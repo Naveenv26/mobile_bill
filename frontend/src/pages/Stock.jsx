@@ -151,9 +151,8 @@ export default function Stock() {
     const currentQty = Number(p.quantity || 0);
     const newQty = currentQty + Number(change);
 
-    // --- FIX START ---
-    if (change < 0 && newQty < 0) return;
-    // --- FIX END ---
+    const allowNegative = shop.config?.inventory?.allowNegative ?? false;
+    if (change < 0 && newQty < 0 && !allowNegative) return;
 
     const updatedProduct = { ...p, quantity: newQty };
     const backup = [...products];
@@ -239,6 +238,14 @@ export default function Stock() {
     const getStockStyles = (p) => {
         const qty = Number(p.quantity);
         
+        // Negative Stock: High Intensity Alert
+        if (qty < 0) return {
+            border: "border-t-4 border-t-rose-600 border-x border-b border-rose-200",
+            bg: "bg-rose-100/40", 
+            text: "text-rose-950",
+            badge: "bg-rose-600 border-rose-700 text-white shadow-sm"
+        };
+
         // Out of Stock: Light Rose Shade
         if (qty === 0) return {
             border: "border-t-4 border-t-rose-500 border-x border-b border-rose-100",
@@ -304,7 +311,6 @@ export default function Stock() {
                     />
                     <StatsCard 
                         title="Low Stock Alerts"
-                        // Use dynamic threshold here
                         value={products.filter(p => p.quantity > 0 && p.quantity <= lowStockThreshold).length}
                         colorFrom="from-amber-500"
                         colorTo="to-orange-500"
@@ -312,8 +318,8 @@ export default function Stock() {
                         accentColor="bg-amber-400"
                     />
                     <StatsCard 
-                        title="Depleted Stock"
-                        value={products.filter(p => p.quantity == 0).length}
+                        title="Out of Stock / Negative"
+                        value={products.filter(p => p.quantity <= 0).length}
                         colorFrom="from-rose-600"
                         colorTo="to-pink-600"
                         shadowColor="shadow-rose-100/50"
@@ -345,29 +351,29 @@ export default function Stock() {
                         renderMobile={(p) => {
                             const style = getStockStyles(p);
                             return (
-                                <div key={p.id} className={`p-6 rounded-xl backdrop-blur-sm transition-colors duration-200 ${style.bg} ${style.border}`}>
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className={`font-bold text-lg ${style.text}`}>{p.name}</h3>
-                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">{p.unit}</span> {/* Darker for visibility */}
-                                        </div>
-                                        <span className="font-bold text-slate-900 text-lg bg-white/60 px-2 py-1 rounded-lg border border-slate-100">₹{p.price}</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center mt-5 pt-4 border-t border-slate-200/40">
-                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${style.badge}`}>
-                                            <span className="text-xs font-bold uppercase text-slate-600 opacity-70">Qty</span> {/* Darker for visibility */}
-                                            <span className="font-bold text-lg text-slate-900">{p.quantity}</span> {/* Darker for visibility */}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => adjustQty(p, -1)} disabled={p.quantity <= 0} className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-rose-400 hover:text-rose-600 transition-colors disabled:opacity-50">-</button>
-                                            <button onClick={() => adjustQty(p, 1)} className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center text-sky-300 hover:bg-sky-700 hover:text-white transition-colors">+</button>
-                                            <div className="w-px h-6 bg-slate-300 mx-2 opacity-50"></div>
-                                            <button onClick={() => openModal(p)} className="p-2 text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors">✏️</button>
-                                            <button onClick={() => handleDelete(p)} className="p-2 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">🗑️</button>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div key={p.id} className={`p-4 sm:p-6 rounded-xl backdrop-blur-sm transition-colors duration-200 ${style.bg} ${style.border}`}>
+                                     <div className="flex justify-between items-start">
+                                         <div>
+                                             <h3 className={`font-bold text-base sm:text-lg ${style.text} truncate max-w-[140px]`}>{p.name}</h3>
+                                             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{p.unit}</span> {/* Darker for visibility */}
+                                         </div>
+                                         <span className="font-bold text-slate-900 text-base bg-white/60 px-2 py-1 rounded-lg border border-slate-100">₹{p.price}</span>
+                                     </div>
+                                     
+                                     <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-200/40">
+                                         <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border ${style.badge}`}>
+                                             <span className="text-[10px] font-bold uppercase text-slate-600 opacity-70">Qty</span> {/* Darker for visibility */}
+                                             <span className="font-bold text-base text-slate-900">{p.quantity}</span> {/* Darker for visibility */}
+                                         </div>
+                                         <div className="flex items-center gap-1.5">
+                                             <button onClick={() => adjustQty(p, -1)} disabled={p.quantity <= 0} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-rose-400 hover:text-rose-600 transition-colors disabled:opacity-50">-</button>
+                                             <button onClick={() => adjustQty(p, 1)} className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-sky-300 hover:bg-sky-700 hover:text-white transition-colors">+</button>
+                                             <div className="w-px h-6 bg-slate-300 mx-1 opacity-50"></div>
+                                             <button onClick={() => openModal(p)} className="p-1.5 text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors text-base">✏️</button>
+                                             <button onClick={() => handleDelete(p)} className="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors text-base">🗑️</button>
+                                         </div>
+                                     </div>
+                                 </div>
                             );
                         }}
                         renderDesktop={() => (

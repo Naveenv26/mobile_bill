@@ -28,11 +28,11 @@ export default function InventorySettings({ settings, onUpdate }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+    <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">Global Low Stock Threshold</h3>
-          <p className="text-sm text-slate-500">Default value for new products alert</p>
+          <h3 className="text-sm sm:text-lg font-bold text-slate-900 leading-tight">Global Low Stock Threshold</h3>
+          <p className="text-[10px] sm:text-sm text-slate-500">Default value for new products alert</p>
         </div>
         <div className="w-24">
             <input 
@@ -46,8 +46,8 @@ export default function InventorySettings({ settings, onUpdate }) {
       <hr className="border-slate-100" />
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">Negative Stock Billing</h3>
-          <p className="text-sm text-slate-500">Allow billing items even if quantity is 0?</p>
+          <h3 className="text-sm sm:text-lg font-bold text-slate-900 leading-tight">Negative Stock Billing</h3>
+          <p className="text-[10px] sm:text-sm text-slate-500">Allow billing items even if quantity is 0?</p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
           <input 
@@ -61,7 +61,7 @@ export default function InventorySettings({ settings, onUpdate }) {
       </div>
       <hr className="border-slate-100" />
       <div>
-          <h3 className="text-lg font-bold text-slate-900 mb-2">Unit Management</h3>
+          <h3 className="text-sm sm:text-lg font-bold text-slate-900 mb-2">Unit Management</h3>
           <div className="flex flex-wrap gap-2 mb-3">
             {units.map(u => (
                 <span key={u} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-sm border border-slate-200 flex items-center gap-2">
@@ -80,7 +80,7 @@ export default function InventorySettings({ settings, onUpdate }) {
           </div>
       </div>
       <div className="flex justify-end pt-4 border-t border-slate-50">
-        <button onClick={handleSave} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20">Update Rules</button>
+        <button onClick={handleSave} className="w-full sm:w-auto bg-slate-900 text-white px-6 py-2.5 rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 font-bold">Update Rules</button>
       </div>
     </div>
   );

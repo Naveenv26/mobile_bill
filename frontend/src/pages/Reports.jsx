@@ -20,18 +20,18 @@ const formatCurrency = (val) => new Intl.NumberFormat("en-IN", { style: "currenc
 const formatDate     = (dateStr) => new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" });
 
 const StatCard = ({ title, value, subtext, icon, gradient, isDark }) => (
-    <div className={`relative overflow-hidden rounded-2xl p-5 shadow-lg w-full h-full ${gradient} ${isDark ? "text-white" : "text-slate-800"}`}>
+    <div className={`relative overflow-hidden rounded-2xl p-4 sm:p-5 shadow-lg w-full h-full ${gradient} ${isDark ? "text-white" : "text-slate-800"}`}>
         <div className="relative z-10 flex flex-col h-full justify-between">
-            <div className="mb-3">
-                <div className={`inline-flex p-2 rounded-xl backdrop-blur-md border shadow-inner ${isDark ? "bg-white/20 border-white/10" : "bg-white/60 border-white/40"}`}>{icon}</div>
+            <div className="mb-2 sm:mb-3">
+                <div className={`inline-flex p-1.5 sm:p-2 rounded-xl backdrop-blur-md border shadow-inner ${isDark ? "bg-white/20 border-white/10" : "bg-white/60 border-white/40"}`}>{icon}</div>
             </div>
             <div>
-                <h3 className="text-2xl font-black tracking-tight">{value}</h3>
-                <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${isDark ? "opacity-80" : "opacity-60"}`}>{title}</p>
-                {subtext && <p className={`text-[10px] mt-2 w-fit px-2 py-0.5 rounded-lg ${isDark ? "bg-white/20 opacity-90" : "bg-slate-200/50 text-slate-700 font-bold"}`}>{subtext}</p>}
+                <h3 className="text-lg sm:text-2xl font-black tracking-tight leading-tight">{value}</h3>
+                <p className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1 ${isDark ? "opacity-80" : "opacity-60"}`}>{title}</p>
+                {subtext && <p className={`text-[8px] sm:text-[10px] mt-1.5 sm:mt-2 w-fit px-2 py-0.5 rounded-lg ${isDark ? "bg-white/20 opacity-90" : "bg-slate-200/50 text-slate-700 font-bold"}`}>{subtext}</p>}
             </div>
         </div>
-        <div className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full blur-xl pointer-events-none ${isDark ? "bg-white/10" : "bg-blue-200/20"}`}></div>
+        <div className={`absolute -bottom-6 -right-6 w-16 h-16 sm:w-24 sm:h-24 rounded-full blur-xl pointer-events-none ${isDark ? "bg-white/10" : "bg-blue-200/20"}`}></div>
     </div>
 );
 
@@ -133,7 +133,7 @@ export default function Reports() {
 
             {/* Header */}
             <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+                <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
                     <div className="flex justify-between items-center mb-3">
                         <h1 className="text-xl font-black text-slate-800 tracking-tight">Analytics</h1>
                         {hasFeature("export") && (
@@ -154,10 +154,10 @@ export default function Reports() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+            <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-6 space-y-6">
 
                 {/* Stat Cards — 2 cols always, 4 on wide desktop */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-4">
                     <StatCard
                         title={tab === "sales" ? "Total Revenue" : tab === "stock" ? "Stock Value" : "Units Sold"}
                         value={tab === "products" ? metrics.card1 : formatCurrency(metrics.card1)}
