@@ -65,7 +65,7 @@ export default function Billing() {
   const [invoiceType, setInvoiceType] = useState("INVOICE");
   const [originalType, setOriginalType] = useState(null);
   const [showCustomForm, setShowCustomForm] = useState(false);
-  const [customItem, setCustomItem] = useState({ name: "", qty: 1, price: 0, tax_rate: 0 });
+  const [customItem, setCustomItem] = useState({ name: "", qty: 1, units_per_box: 1, price: 0, discounted_price: 0, tax_rate: 0, is_tax_inclusive: false });
 
   const [currentShop, setCurrentShop] = useState(
     JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "", config: {} }
@@ -172,21 +172,39 @@ export default function Billing() {
   };
 
   const addCustomToCart = () => {
-    if (!customItem.name || customItem.price <= 0) {
+    if (!customItem.name || (customItem.price <= 0 && customItem.discounted_price <= 0)) {
       toast.error("Enter item name and price");
       return;
     }
+    
+    // Wholesale Box Multiplier: Total Qty = Boxes * Units/Box
+    const totalQty = (Number(customItem.qty) || 1) * (Number(customItem.units_per_box) || 1);
+
+    // Use discounted_price if set, otherwise use original price
+    let finalPrice = Number(customItem.discounted_price) > 0 
+      ? Number(customItem.discounted_price) 
+      : Number(customItem.price);
+
+    const taxRate = Number(customItem.tax_rate) || 0;
+
+    // Handle Inclusive Tax: Back-calculate base price
+    // If inclusive, finalPrice is the "Total per Unit". 
+    // We need unit_price such that: unit_price + (unit_price * taxRate / 100) = finalPrice
+    if (customItem.is_tax_inclusive && taxRate > 0) {
+      finalPrice = finalPrice / (1 + taxRate / 100);
+    }
+
     const newItem = {
       id: `custom-${Date.now()}`,
       name: customItem.name,
-      price: Number(customItem.price),
-      qty: Number(customItem.qty),
-      tax_rate: Number(customItem.tax_rate),
+      price: finalPrice,
+      qty: totalQty,
+      tax_rate: taxRate,
       isCustom: true,
       stock: 999999
     };
     setCart((prev) => [...prev, newItem]);
-    setCustomItem({ name: "", qty: 1, price: 0, tax_rate: 0 });
+    setCustomItem({ name: "", qty: 1, units_per_box: 1, price: 0, discounted_price: 0, tax_rate: 0, is_tax_inclusive: false });
     setShowCustomForm(false);
     toast.success("Custom item added");
   };
@@ -600,7 +618,7 @@ export default function Billing() {
               onClick={() => setShowCustomForm(!showCustomForm)}
               className={`px-6 py-3.5 rounded-2xl border-2 border-black font-black text-[11px] uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all flex-shrink-0 ${showCustomForm ? "bg-amber-400 text-black" : "bg-white text-slate-800"}`}
             >
-              {showCustomForm ? "CLOSE" : "+ CUSTOM"}
+              {showCustomForm ? "CLOSE" : "+ CUSTOM / BOX"}
             </button>
           )}
         </div>
@@ -624,28 +642,85 @@ export default function Billing() {
                 <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">PRICE</label>
                 <input
                   type="number"
-                  placeholder="Price"
+                  placeholder="0.00"
                   value={customItem.price || ""}
                   onChange={(e) => setCustomItem({ ...customItem, price: e.target.value })}
                   className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">QTY</label>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">DISCOUNTED</label>
                 <input
                   type="number"
-                  placeholder="Qty"
+                  placeholder="Final Price"
+                  value={customItem.discounted_price || ""}
+                  onChange={(e) => setCustomItem({ ...customItem, discounted_price: e.target.value })}
+                  className="w-full bg-emerald-50 text-emerald-700 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">TAX %</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Rate"
+                    value={customItem.tax_rate || ""}
+                    onChange={(e) => setCustomItem({ ...customItem, tax_rate: e.target.value })}
+                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    onClick={() => setCustomItem({ ...customItem, is_tax_inclusive: !customItem.is_tax_inclusive })}
+                    className={`px-3 rounded-xl border-2 font-black text-[9px] uppercase tracking-tighter transition-all ${customItem.is_tax_inclusive ? "bg-emerald-500 border-emerald-600 text-white" : "bg-white border-slate-200 text-slate-400"}`}
+                  >
+                    {customItem.is_tax_inclusive ? "INC" : "EXC"}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">BOXES (QTY)</label>
+                <input
+                  type="number"
+                  placeholder="Count"
                   value={customItem.qty}
                   onChange={(e) => setCustomItem({ ...customItem, qty: e.target.value })}
                   className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div className="col-span-2">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">UNITS / BOX</label>
+                <input
+                  type="number"
+                  placeholder="Multiplier"
+                  value={customItem.units_per_box}
+                  onChange={(e) => setCustomItem({ ...customItem, units_per_box: e.target.value })}
+                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Wholesale Live Preview */}
+              <div className="col-span-2 mt-2 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 flex justify-between items-center">
+                 <div>
+                   <div className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Total Qty</div>
+                   <div className="text-lg font-black text-indigo-700">{(customItem.qty || 0) * (customItem.units_per_box || 1)} <span className="text-[10px] font-normal">units</span></div>
+                 </div>
+                 <div className="text-right">
+                   <div className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Est. Final Total ({customItem.is_tax_inclusive ? "Inc" : "Exc"})</div>
+                   <div className="text-lg font-black text-indigo-700">
+                     ₹{(
+                       customItem.is_tax_inclusive 
+                       ? ((Number(customItem.discounted_price) || Number(customItem.price) || 0) * ((customItem.qty || 0) * (customItem.units_per_box || 1)))
+                       : ((Number(customItem.discounted_price) || Number(customItem.price) || 0) * ((customItem.qty || 0) * (customItem.units_per_box || 1))) * (1 + (Number(customItem.tax_rate) || 0) / 100)
+                     ).toFixed(2)}
+                   </div>
+                 </div>
+              </div>
+
+              <div className="col-span-2 pt-2">
                 <button
                   onClick={addCustomToCart}
-                  className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all"
+                  className="w-full bg-indigo-600 text-white py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
-                  Add to Cart
+                  Confirm & Add to Bill
                 </button>
               </div>
             </div>
