@@ -11,6 +11,7 @@ class Shop(models.Model):
     language = models.CharField(max_length=20, default="en")
     business_type = models.CharField(max_length=40, default="Kirana / Grocery")
     counter_invoice = models.PositiveIntegerField(default=0)
+    counter_quotation = models.PositiveIntegerField(default=0)
     whatsapp_number = models.CharField(max_length=20, blank=True, null=True)
     config = models.JSONField(default=dict, blank=True)
     currency = models.CharField(max_length=10, default='INR')

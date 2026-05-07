@@ -232,6 +232,30 @@ class InvoiceViewSet(ShopFilteredViewSet):
             inv.save(update_fields=['number'])
 
         return Response({"message": "Invoice deleted and sequence renumbered successfully."}, status=status.HTTP_200_OK)
+
+class QuotationViewSet(ShopFilteredViewSet):
+    queryset = Invoice.objects.filter(invoice_type='QUOTATION').order_by('-invoice_date')
+    serializer_class = InvoiceSerializer
+    pagination_class = StandardPagination
+
+    def get_queryset(self):
+        return Invoice.objects.filter(
+            shop=self.request.user.shop,
+            invoice_type='QUOTATION'
+        ).select_related(
+            'customer', 'created_by', 'shop'
+        ).prefetch_related(
+            'items__product'
+        ).order_by('-invoice_date')
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        # Force invoice_type to QUOTATION even if sent otherwise
+        serializer.save(
+            shop=self.request.user.shop,
+            created_by=self.request.user,
+            invoice_type='QUOTATION'
+        )
 class ShopViewSet(viewsets.ModelViewSet):
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer

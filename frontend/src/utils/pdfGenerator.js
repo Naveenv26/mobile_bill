@@ -123,7 +123,7 @@ export const generateThermalPDF = async (printData, currentShop) => {
     cur += 5;
     if (cMobile) doc.text(`Mob: ${cMobile}`, lx, cur);
     const isQuote = printData.invoice_type === 'QUOTATION';
-    doc.text(`${isQuote ? "Quote" : "Bill"} No: #${printData.number || printData.id || "N/A"}`, rx, cur, { align: "right" });
+    doc.text(`${isQuote ? "Quotation" : "Bill"} No: #${printData.number || printData.id || "N/A"}`, rx, cur, { align: "right" });
     cur += 4;
 
     // Items table

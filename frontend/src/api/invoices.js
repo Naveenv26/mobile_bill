@@ -89,3 +89,29 @@ export const updateInvoice = async (id, data) => {
   const res = await client.put(`/invoices/${id}/`, payload);
   return res.data;
 };
+
+// ── Quotations (Separate Endpoint) ───────────────────────────────────
+
+export const fetchAllQuotations = async (params = {}) => {
+  let results = [];
+  let page = 1;
+  while (true) {
+    const res = await client.get("/quotations/", { params: { ...params, page, page_size: 100 } });
+    const data = res.data;
+    const pageResults = Array.isArray(data) ? data : (data?.results ?? []);
+    results = results.concat(pageResults);
+    if (!data?.next || pageResults.length === 0) break;
+    page++;
+  }
+  return results;
+};
+
+export const createQuotation = async (data) => {
+  const res = await client.post("/quotations/", { ...data, invoice_type: "QUOTATION" });
+  return res.data;
+};
+
+export const updateQuotation = async (id, data) => {
+  const res = await client.put(`/quotations/${id}/`, { ...data, invoice_type: "QUOTATION" });
+  return res.data;
+};

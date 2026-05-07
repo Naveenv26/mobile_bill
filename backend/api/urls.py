@@ -13,6 +13,7 @@ from .views import (
     ProductViewSet,
     CustomerViewSet,
     InvoiceViewSet,
+    QuotationViewSet,
     ShopViewSet,
     MeViewSet,
     ReportsViewSet,
@@ -57,6 +58,7 @@ router.register(r'subscription-plans', SubscriptionPlanViewSet, basename='subscr
 router.register(r'products', ProductViewSet, basename='product')
 router.register(r'customers', CustomerViewSet, basename='customer')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
+router.register(r'quotations', QuotationViewSet, basename='quotation')
 router.register(r'taxprofiles', TaxProfileViewSet, basename='taxprofile')
 router.register(r'shops', ShopViewSet, basename='shop')
 router.register(r'admin/shops', AdminShopViewSet, basename='admin-shops')  # ✅ added

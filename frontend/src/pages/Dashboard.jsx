@@ -91,15 +91,15 @@ export default function Dashboard() {
         <div className="flex justify-between items-start mb-2">
           <div>
             <p className="text-slate-400 text-xs uppercase tracking-widest font-semibold">Total Revenue</p>
-            <div className="flex items-baseline mt-1 gap-1">
-              <span className="text-3xl text-white font-light">₹</span>
-              <h1 className="text-4xl font-bold text-white tracking-tight">
+            <div className="flex items-baseline mt-1 gap-1 flex-wrap">
+              <span className="text-2xl sm:text-3xl text-white font-light">₹</span>
+              <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight break-all">
                 {totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </h1>
             </div>
-            <p className="text-slate-500 text-[10px] sm:text-xs mt-2">
-              Today: <span className="text-emerald-400 font-bold">₹{todaySales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
-              <span className="ml-2 text-slate-600">{allInvoices.length} total</span>
+            <p className="text-slate-500 text-[10px] sm:text-xs mt-2 flex flex-wrap gap-x-2">
+              <span>Today: <span className="text-emerald-400 font-bold">₹{todaySales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></span>
+              <span className="text-slate-600">{allInvoices.length} total</span>
             </p>
           </div>
           <div className="bg-slate-800 p-2 rounded-full">
@@ -185,9 +185,14 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-xs font-bold text-slate-800 truncate">
-                        {inv.customer_detail?.name || inv.customer_name || "Walk-in"}
-                      </h3>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-xs font-bold text-slate-800 truncate">
+                          {inv.customer_detail?.name || inv.customer_name || "Walk-in"}
+                        </h3>
+                        <span className={`text-[7px] font-black px-1 rounded-sm uppercase ${inv.invoice_type === 'QUOTATION' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                          {inv.invoice_type === 'QUOTATION' ? 'QUA' : 'INV'}
+                        </span>
+                      </div>
                       <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                         {new Date(inv.created_at || inv.invoice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                         <span className="mx-1">•</span>#{inv.number || inv.id}

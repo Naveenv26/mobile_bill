@@ -206,6 +206,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 qty=qty, 
                 unit_price=price,
                 tax_rate=tax, 
+                cost_price=prod.cost_price if prod else 0,
                 line_total=line_total + line_tax
             )
 
@@ -230,12 +231,22 @@ class InvoiceSerializer(serializers.ModelSerializer):
         discount_amount = validated_data.get("discount_total", 0)
         shop = Shop.objects.select_for_update().get(id=request.user.shop.id)
 
-        # 1. Generate Invoice Number
-        shop.counter_invoice = F('counter_invoice') + 1
-        shop.save()
-        shop.refresh_from_db()
-        # Example: "INV-10-1" (ShopID-Counter)
-        formatted_number = f"INV-{shop.id}-{shop.counter_invoice}"
+        # 1. Generate Number based on Type
+        inv_type = validated_data.get('invoice_type', 'INVOICE')
+        if inv_type == 'QUOTATION':
+            shop.counter_quotation = F('counter_quotation') + 1
+            prefix = "QUA"
+            shop.save()
+            shop.refresh_from_db()
+            counter = shop.counter_quotation
+        else:
+            shop.counter_invoice = F('counter_invoice') + 1
+            prefix = "INV"
+            shop.save()
+            shop.refresh_from_db()
+            counter = shop.counter_invoice
+
+        formatted_number = f"{prefix}-{shop.id}-{counter}"
 
         # 2. Handle Customer
         c_name = validated_data.pop("customer_name", "Walk-in")

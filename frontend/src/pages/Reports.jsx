@@ -1,6 +1,6 @@
 // frontend/src/pages/Reports.jsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { fetchAllInvoices } from "../api/invoices.js";
+import { fetchAllInvoices, fetchAllQuotations } from "../api/invoices.js";
 import { fetchAllProducts } from "../api/products.js";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
 import { utils, writeFileXLSX } from "xlsx";
@@ -38,6 +38,7 @@ const StatCard = ({ title, value, subtext, icon, gradient, isDark }) => (
 export default function Reports() {
     const [tab, setTab]                         = useState("sales");
     const [invoices, setInvoices]               = useState([]);
+    const [quotations, setQuotations]           = useState([]);
     const [products, setProducts]               = useState([]);
     const [fromDate, setFromDate]               = useState("");
     const [toDate, setToDate]                   = useState("");
@@ -53,8 +54,9 @@ export default function Reports() {
         const loadData = async () => {
             setLoading(true);
             try {
-                const [inv, prod] = await Promise.all([fetchAllInvoices(), fetchAllProducts()]);
+                const [inv, quo, prod] = await Promise.all([fetchAllInvoices(), fetchAllQuotations(), fetchAllProducts()]);
                 setInvoices(inv);
+                setQuotations(quo);
                 setProducts(prod);
             } catch (e) { 
                 console.error(e); 
@@ -67,8 +69,9 @@ export default function Reports() {
 
     const loadInvoices = async () => {
         try {
-            const inv = await fetchAllInvoices();
+            const [inv, quo] = await Promise.all([fetchAllInvoices(), fetchAllQuotations()]);
             setInvoices(inv);
+            setQuotations(quo);
         } catch (e) { console.error(e); }
     };
 
@@ -98,24 +101,19 @@ export default function Reports() {
         const start = fromDate ? new Date(fromDate + "T00:00:00") : null;
         const end   = toDate   ? new Date(toDate   + "T23:59:59") : null;
         const q     = search.toLowerCase();
-        const filteredInvoices = invoices.filter((inv) => {
-            if (!inv.invoice_date) return false;
-            const d = new Date(inv.invoice_date);
-            return (!start || d >= start) && (!end || d <= end);
-        });
 
         if (tab === "sales") {
-            return filteredInvoices.filter((i) => { 
-                const type = i.invoice_type || "INVOICE";
-                if (type !== "INVOICE") return false;
+            return invoices.filter((i) => { 
+                const d = new Date(i.invoice_date);
+                if ((start && d < start) || (end && d > end)) return false;
                 const n = i.customer_detail?.name || i.customer_name || ""; 
                 return n.toLowerCase().includes(q) || String(i.number).includes(q); 
             });
         }
         if (tab === "quotations") {
-            return filteredInvoices.filter((i) => { 
-                const type = i.invoice_type || "INVOICE";
-                if (type !== "QUOTATION") return false;
+            return quotations.filter((i) => { 
+                const d = new Date(i.invoice_date);
+                if ((start && d < start) || (end && d > end)) return false;
                 const n = i.customer_detail?.name || i.customer_name || ""; 
                 return n.toLowerCase().includes(q) || String(i.number).includes(q); 
             });
@@ -123,18 +121,36 @@ export default function Reports() {
         if (tab === "stock") return products.filter((p) => p.name.toLowerCase().includes(q));
         
         const salesMap = {};
-        filteredInvoices.filter(i => (i.invoice_type || "INVOICE") === "INVOICE").forEach((inv) => inv.items?.forEach((it) => { 
-            const name = it.product_name || it.name || "Unknown"; 
-            salesMap[name] = (salesMap[name] || 0) + Number(it.qty || 0); 
-        }));
+        invoices.forEach((inv) => {
+            const d = new Date(inv.invoice_date);
+            if ((start && d < start) || (end && d > end)) return;
+            inv.items?.forEach((it) => { 
+                const name = it.product_name || it.name || "Unknown"; 
+                salesMap[name] = (salesMap[name] || 0) + Number(it.qty || 0); 
+            });
+        });
         return Object.entries(salesMap).map(([name, qty]) => ({ name, qty, price: products.find((p) => p.name === name)?.price || 0 })).filter((p) => p.name.toLowerCase().includes(q)).sort((a, b) => b.qty - a.qty);
-    }, [invoices, products, fromDate, toDate, search, tab]);
+    }, [invoices, quotations, products, fromDate, toDate, search, tab]);
 
     const metrics = useMemo(() => {
-        if (tab === "sales" || tab === "quotations") return { card1: filteredData.reduce((s, i) => s + Number(i.grand_total || 0), 0), card2: filteredData.length };
+        if (tab === "sales" || tab === "quotations") {
+            let totalRev = 0;
+            let totalProfit = 0;
+            filteredInvoices.forEach(inv => {
+                if ((inv.invoice_type || "INVOICE") === (tab === "sales" ? "INVOICE" : "QUOTATION")) {
+                    totalRev += Number(inv.grand_total || 0);
+                    (inv.items || []).forEach(it => {
+                        const cost = Number(it.cost_price || 0);
+                        const rev = Number(it.line_total || 0);
+                        totalProfit += (rev - (cost * Number(it.qty || 0)));
+                    });
+                }
+            });
+            return { card1: totalRev, card2: filteredData.length, profit: totalProfit };
+        }
         if (tab === "stock") return { card1: filteredData.reduce((s, p) => s + p.price * p.quantity, 0), card2: filteredData.filter((p) => Number(p.quantity) <= 5).length };
         return { card1: filteredData.reduce((s, p) => s + p.qty, 0), card2: filteredData[0] || { name: "N/A", qty: 0 } };
-    }, [filteredData, tab]);
+    }, [filteredData, tab, filteredInvoices]);
 
     const chartData = useMemo(() => {
         if (tab === "sales" || tab === "quotations") {
@@ -184,10 +200,10 @@ export default function Reports() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-6 space-y-6">
+            <div className="max-w-7xl mx-auto px-2 sm:px-6 pt-4 space-y-4">
 
-                {/* Stat Cards — 2 cols always, 4 on wide desktop */}
-                <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                {/* Stat Cards — Stack on 320px, 2 cols on tablet+ */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     <StatCard
                         title={tab === "sales" ? "Total Revenue" : tab === "quotations" ? "Total Quotation" : tab === "stock" ? "Stock Value" : "Units Sold"}
                         value={tab === "products" ? metrics.card1 : formatCurrency(metrics.card1)}
@@ -195,6 +211,7 @@ export default function Reports() {
                         gradient={tab === "sales" ? "bg-gradient-to-br from-[#0A1A2F] to-[#0F172A]" : tab === "stock" ? "bg-gradient-to-br from-[#0F172A] to-[#1E1B4B]" : "bg-gradient-to-br from-[#155E75] to-[#1E3A8A]"}
                         icon={tab === "sales" ? <TrendingUpIcon /> : tab === "quotations" ? <div className="text-white"><SearchIcon /></div> : tab === "stock" ? <CubeIcon /> : <StarIcon />}
                     />
+                    {tab === "sales" && <StatCard title="Est. Profit" value={formatCurrency(metrics.profit)} subtext="Gross Margin" isDark={false} gradient="bg-gradient-to-br from-[#ECFDF5] to-[#D1FAE5]" icon={<div className="text-emerald-600"><TrendingUpIcon /></div>} />}
                     {(tab === "sales" || tab === "quotations") && <StatCard title="Transactions"   value={metrics.card2}                       subtext="Count"  isDark={false} gradient="bg-gradient-to-br from-[#BFDBFE] to-[#67E8F9]"   icon={<div className="font-serif italic font-black text-xl">#</div>} />}
                     {tab === "stock"    && <StatCard title="Low Stock Alert" value={metrics.card2}                       subtext="Items below 5 qty"   isDark={false} gradient="bg-gradient-to-br from-[#C7D2FE] to-[#CBD5E1]"   icon={<AlertIcon />} />}
                     {tab === "products" && <StatCard title="Top Performer"   value={metrics.card2.name?.substring(0,12)} subtext={`${metrics.card2.qty} units sold`} isDark={false} gradient="bg-gradient-to-br from-[#F1F5F9] to-[#EFF6FF]" icon={<StarIcon />} />}
@@ -206,7 +223,7 @@ export default function Reports() {
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Overview</p>
                         <h2 className="text-xl font-black text-slate-800">Performance Trend</h2>
                     </div>
-                    <div className="h-64 w-full mt-2">
+                    <div className="h-48 sm:h-64 w-full mt-2">
                         <ResponsiveContainer width="100%" height="100%">
                             {tab === "sales" ? (
                                 <AreaChart data={chartData} margin={{ top: 10, right: 16, left: -20, bottom: 0 }}>
@@ -256,12 +273,17 @@ export default function Reports() {
                                     onClick={() => (tab === "sales" || tab === "quotations") && setSelectedInvoice(item)}
                                     className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center transition-all ${(tab === "sales" || tab === "quotations") ? "cursor-pointer hover:border-indigo-200 hover:shadow-md active:scale-[0.98]" : ""}`}
                                 >
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-sm font-bold shadow-inner flex-shrink-0 ${themeColor.bg} ${themeColor.text}`}>{initial}</div>
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl flex items-center justify-center text-xs sm:text-sm font-bold shadow-inner flex-shrink-0 ${themeColor.bg} ${themeColor.text}`}>{initial}</div>
                                         <div className="min-w-0">
-                                            <h4 className="font-bold text-slate-800 text-sm truncate leading-tight">{displayName}</h4>
+                                            <div className="flex items-center gap-1.5">
+                                                <h4 className="font-bold text-slate-800 text-sm truncate leading-tight">{displayName}</h4>
+                                                <span className={`text-[8px] font-black px-1 rounded ${item.invoice_type === 'QUOTATION' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                                                    {item.invoice_type === 'QUOTATION' ? 'QUA' : 'INV'}
+                                                </span>
+                                            </div>
                                             <p className="text-[10px] text-slate-400 font-semibold uppercase mt-1 tracking-wide">
-                                                {tab === "sales" ? <span>{formatDate(item.invoice_date)} • #{item.number}</span> : tab === "stock" ? `₹${item.price}/unit` : `${item.qty} units sold`}
+                                                {tab === "sales" || tab === "quotations" ? <span>{formatDate(item.invoice_date)} • #{item.number}</span> : tab === "stock" ? `₹${item.price}/unit` : `${item.qty} units sold`}
                                             </p>
                                         </div>
                                     </div>

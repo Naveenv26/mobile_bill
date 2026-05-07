@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSubscription } from "../context/SubscriptionContext.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAllProducts } from "../api/products.js";
-import { createInvoice, updateInvoice } from "../api/invoices.js";
+import { createInvoice, updateInvoice, createQuotation, updateQuotation } from "../api/invoices.js";
 import { fetchAllCustomers } from "../api/customers.js";
 import toast from "react-hot-toast";
 import { jsPDF } from "jspdf";
@@ -282,10 +282,18 @@ export default function Billing() {
       };
 
       let res;
-      if (isEditMode && editInvoiceId) {
-        res = await updateInvoice(editInvoiceId, payload);
+      if (invoiceType === "QUOTATION") {
+        if (isEditMode && editInvoiceId) {
+          res = await updateQuotation(editInvoiceId, payload);
+        } else {
+          res = await createQuotation(payload);
+        }
       } else {
-        res = await createInvoice(payload);
+        if (isEditMode && editInvoiceId) {
+          res = await updateInvoice(editInvoiceId, payload);
+        } else {
+          res = await createInvoice(payload);
+        }
       }
       
       // Axios or our wrapper might return data directly or in .data
