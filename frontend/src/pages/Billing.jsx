@@ -4,6 +4,7 @@ import { useSubscription } from "../context/SubscriptionContext.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAllProducts } from "../api/products.js";
 import { createInvoice, updateInvoice } from "../api/invoices.js";
+import { fetchAllCustomers } from "../api/customers.js";
 import toast from "react-hot-toast";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -62,6 +63,9 @@ export default function Billing() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editInvoiceId, setEditInvoiceId] = useState(null);
+  const [allCustomers, setAllCustomers] = useState([]);
+  const [filteredCustomers, setFilteredCustomers] = useState([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [invoiceType, setInvoiceType] = useState("INVOICE");
   const [originalType, setOriginalType] = useState(null);
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -119,7 +123,19 @@ export default function Billing() {
     return () => window.removeEventListener("shop-updated", handleUpdate);
   }, []);
 
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => {
+    loadProducts();
+    loadCustomers();
+  }, []);
+
+  const loadCustomers = async () => {
+    try {
+      const res = await fetchAllCustomers();
+      setAllCustomers(res.data || []);
+    } catch (err) {
+      console.error("Failed to load customers", err);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -583,16 +599,53 @@ export default function Billing() {
         </div>
 
         <div className="px-4 pb-4 flex gap-3">
-          <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center px-3 gap-2">
+          <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center px-3 gap-2 relative">
             <span className="text-[10px] font-bold text-slate-400">TO:</span>
             <input
               ref={nameRef}
               type="text"
               placeholder="Customer Name"
               value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCustomerName(val);
+                if (val.trim().length > 0) {
+                  const filtered = allCustomers.filter(c => 
+                    c.name.toLowerCase().includes(val.toLowerCase()) || 
+                    (c.mobile && c.mobile.includes(val))
+                  );
+                  setFilteredCustomers(filtered);
+                  setShowCustomerDropdown(true);
+                } else {
+                  setShowCustomerDropdown(false);
+                }
+              }}
+              onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
               className="w-full bg-transparent border-none py-2 text-sm font-bold focus:ring-0 placeholder:font-normal"
             />
+            
+            {/* Customer Dropdown */}
+            {showCustomerDropdown && filteredCustomers.length > 0 && (
+              <div className="absolute z-[60] left-0 right-0 top-full mt-1 bg-white border-2 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-48 overflow-y-auto overflow-x-hidden">
+                {filteredCustomers.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setCustomerName(c.name);
+                      setCustomerMobile(c.mobile || "");
+                      setShowCustomerDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex justify-between items-center"
+                  >
+                    <div>
+                      <div className="text-[11px] font-black text-slate-800">{c.name}</div>
+                      {c.mobile && <div className="text-[9px] text-slate-400">{c.mobile}</div>}
+                    </div>
+                    <div className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">Select</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="w-32 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center px-3 gap-2">
             <span className="text-[10px] font-bold text-slate-400">PH:</span>
