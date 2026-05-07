@@ -7,7 +7,7 @@ import { utils, writeFileXLSX } from "xlsx";
 import InvoiceModal from "../components/InvoiceModal.jsx";
 import toast from "react-hot-toast";
 
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const DownloadIcon   = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
 const CalendarIcon   = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
@@ -222,6 +222,13 @@ export default function Reports() {
                                     <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 8 }} axisLine={false} tickLine={false} dy={5} />
                                     <YAxis tick={{ fontSize: 8 }} axisLine={false} tickLine={false} />
                                 </AreaChart>
+                            ) : tab === "quotations" ? (
+                                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -35, bottom: 0 }}>
+                                    <Tooltip cursor={{ stroke: themeColor.hex, strokeWidth: 1, strokeDasharray: "3 3" }} contentStyle={{ borderRadius: "8px", fontSize: "10px", fontWeight: "bold", padding: "4px" }} formatter={(v) => [formatCurrency(v), ""]} />
+                                    <Line type="monotone" dataKey="total" stroke={themeColor.hex} strokeWidth={3} dot={{ r: 3, fill: themeColor.hex, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: themeColor.hex }} />
+                                    <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 8 }} axisLine={false} tickLine={false} dy={5} />
+                                    <YAxis tick={{ fontSize: 8 }} axisLine={false} tickLine={false} />
+                                </LineChart>
                             ) : (
                                 <BarChart data={chartData} barSize={16} margin={{ top: 5, right: 10, left: -35, bottom: 0 }}>
                                     <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ borderRadius: "6px", fontSize: "10px", fontWeight: "bold", padding: "4px" }} />
