@@ -27,7 +27,7 @@ const StatCard = ({ title, value, subtext, icon, gradient, isDark }) => (
                 <div className={`inline-flex p-1.5 sm:p-2 rounded-xl backdrop-blur-md border shadow-inner ${isDark ? "bg-white/20 border-white/10" : "bg-white/60 border-white/40"}`}>{icon}</div>
             </div>
             <div>
-                <h3 className="text-sm sm:text-2xl font-black tracking-tight leading-tight">{value}</h3>
+                <h3 className="text-sm sm:text-2xl font-black tracking-tight leading-tight truncate">{value}</h3>
                 <p className={`text-[7px] sm:text-[10px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1 ${isDark ? "opacity-80" : "opacity-60"}`}>{title}</p>
                 {subtext && <p className={`text-[7px] sm:text-[10px] mt-1.5 sm:mt-2 w-fit px-1.5 py-0.5 rounded-lg ${isDark ? "bg-white/20 opacity-90" : "bg-slate-200/50 text-slate-700 font-bold"}`}>{subtext}</p>}
             </div>
@@ -163,29 +163,27 @@ export default function Reports() {
     if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 text-sm animate-pulse">Loading Data...</div>;
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] font-sans pb-24">
+        <div className="min-h-screen w-full overflow-x-hidden bg-[#F8FAFC] font-sans pb-24">
 
             {/* Header */}
-            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
-                        <h1 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">Analytics</h1>
+            <div className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-md border-b border-gray-100">
+                <div className="w-full mx-auto px-3 sm:px-6 py-3">
+                    <div className="flex justify-between items-center mb-3">
+                        <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Analytics</h1>
                         {hasFeature("export") && (
-                            <div ref={exportMenuRef}>
-                                <button onClick={handleExport} className="flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-bold shadow-md active:scale-95 transition-all">
-                                    <DownloadIcon /> <span>EXPORT REPORT</span>
-                                </button>
-                            </div>
+                            <button onClick={handleExport} className="flex items-center justify-center w-9 h-9 sm:w-auto sm:h-auto sm:px-4 sm:py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-full sm:rounded-xl shadow-lg active:scale-95 transition-all flex-shrink-0">
+                                <DownloadIcon /> <span className="hidden sm:inline ml-2 text-[10px] font-bold">EXPORT REPORT</span>
+                            </button>
                         )}
                     </div>
-                    <div className="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
+                    <div className="flex space-x-2 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory touch-pan-x">
                         {[
                             { id: "sales", label: "Revenue" }, 
                             { id: "quotations", label: "Quotations" },
                             { id: "stock", label: "Inventory" }, 
                             { id: "products", label: "Products" }
                         ].map((t) => (
-                            <button key={t.id} onClick={() => { setTab(t.id); setSearch(""); }} className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all ${tab === t.id ? "bg-slate-900 text-white shadow-md scale-105" : "bg-white text-slate-500 border border-slate-200"}`}>
+                            <button key={t.id} onClick={() => { setTab(t.id); setSearch(""); }} className={`snap-start shrink-0 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${tab === t.id ? "bg-slate-900 text-white shadow-md scale-105" : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"}`}>
                                 {t.label}
                             </button>
                         ))}
@@ -193,7 +191,7 @@ export default function Reports() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-2 sm:px-6 pt-4 space-y-4">
+            <div className="w-full px-2 sm:px-6 pt-4 space-y-4">
 
                 {/* Stat Cards — Stack on 320px, 2 cols on tablet+ */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
