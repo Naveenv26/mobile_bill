@@ -26,9 +26,9 @@ const StatCard = ({ title, value, subtext, icon, gradient, isDark }) => (
                 <div className={`inline-flex p-1.5 sm:p-2 rounded-xl backdrop-blur-md border shadow-inner ${isDark ? "bg-white/20 border-white/10" : "bg-white/60 border-white/40"}`}>{icon}</div>
             </div>
             <div>
-                <h3 className="text-lg sm:text-2xl font-black tracking-tight leading-tight">{value}</h3>
-                <p className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1 ${isDark ? "opacity-80" : "opacity-60"}`}>{title}</p>
-                {subtext && <p className={`text-[8px] sm:text-[10px] mt-1.5 sm:mt-2 w-fit px-2 py-0.5 rounded-lg ${isDark ? "bg-white/20 opacity-90" : "bg-slate-200/50 text-slate-700 font-bold"}`}>{subtext}</p>}
+                <h3 className="text-sm sm:text-2xl font-black tracking-tight leading-tight">{value}</h3>
+                <p className={`text-[7px] sm:text-[10px] font-bold uppercase tracking-widest mt-0.5 sm:mt-1 ${isDark ? "opacity-80" : "opacity-60"}`}>{title}</p>
+                {subtext && <p className={`text-[7px] sm:text-[10px] mt-1.5 sm:mt-2 w-fit px-1.5 py-0.5 rounded-lg ${isDark ? "bg-white/20 opacity-90" : "bg-slate-200/50 text-slate-700 font-bold"}`}>{subtext}</p>}
             </div>
         </div>
         <div className={`absolute -bottom-6 -right-6 w-16 h-16 sm:w-24 sm:h-24 rounded-full blur-xl pointer-events-none ${isDark ? "bg-white/10" : "bg-blue-200/20"}`}></div>
@@ -137,13 +137,18 @@ export default function Reports() {
     }, [filteredData, tab]);
 
     const chartData = useMemo(() => {
-        if (tab === "sales") {
+        if (tab === "sales" || tab === "quotations") {
             const grouped = {};
-            filteredData.forEach((inv) => { const date = inv.invoice_date.split("T")[0]; grouped[date] = (grouped[date] || 0) + Number(inv.grand_total || 0); });
+            filteredData.forEach((inv) => { 
+                if (inv.invoice_date) {
+                    const date = inv.invoice_date.split("T")[0]; 
+                    grouped[date] = (grouped[date] || 0) + Number(inv.grand_total || 0); 
+                }
+            });
             const sorted = Object.entries(grouped).map(([date, total]) => ({ date, total })).sort((a, b) => new Date(a.date) - new Date(b.date));
             return sorted.length > 15 ? sorted.slice(-15) : sorted;
         }
-        return filteredData.slice(0, 7).map((p) => ({ name: p.name.substring(0, 10), value: Number(p.quantity || p.qty) }));
+        return filteredData.slice(0, 7).map((p) => ({ name: (p.name || "Item").substring(0, 10), value: Number(p.quantity || p.qty || 0) }));
     }, [filteredData, tab]);
 
     if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 text-sm animate-pulse">Loading Data...</div>;
