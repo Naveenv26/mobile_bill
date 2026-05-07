@@ -105,6 +105,7 @@ export default function Reports() {
 
         if (tab === "sales") {
             return invoices.filter((i) => { 
+                if (i.invoice_type === 'QUOTATION') return false;
                 const d = new Date(i.invoice_date);
                 if ((start && d < start) || (end && d > end)) return false;
                 const n = i.customer_detail?.name || i.customer_name || ""; 
@@ -123,6 +124,7 @@ export default function Reports() {
         
         const salesMap = {};
         invoices.forEach((inv) => {
+            if (inv.invoice_type === 'QUOTATION') return;
             const d = new Date(inv.invoice_date);
             if ((start && d < start) || (end && d > end)) return;
             inv.items?.forEach((it) => { 
