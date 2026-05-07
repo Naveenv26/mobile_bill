@@ -23,7 +23,4 @@ def _send_password_reset_email_task(email, reset_url):
     msg.send(fail_silently=False)
 
 def send_password_reset_email(email, reset_url):
-    # Launch email task in a separate thread so it doesn't block the request
-    thread = threading.Thread(target=_send_password_reset_email_task, args=(email, reset_url))
-    thread.daemon = True
-    thread.start()
+    _send_password_reset_email_task(email, reset_url)

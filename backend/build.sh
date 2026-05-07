@@ -9,7 +9,10 @@ pip install -r requirements.txt
 echo "--- Running Collectstatic ---"
 python manage.py collectstatic --no-input
 
-echo "--- Applying Migrations to Neon DB ---"
+echo "--- Making Migrations ---"
+python manage.py makemigrations --no-input
+
+echo "--- Applying Migrations ---"
 python manage.py migrate --no-input || echo "⚠️ Warning: Migrations failed. Please check your DATABASE_URL."
 
 echo "--- Seeding Subscription Plans ---"

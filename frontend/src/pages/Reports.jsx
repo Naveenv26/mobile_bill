@@ -103,15 +103,35 @@ export default function Reports() {
             const d = new Date(inv.invoice_date);
             return (!start || d >= start) && (!end || d <= end);
         });
-        if (tab === "sales") return filteredInvoices.filter((i) => { const n = i.customer_detail?.name || i.customer_name || ""; return n.toLowerCase().includes(q) || String(i.number).includes(q); });
+
+        if (tab === "sales") {
+            return filteredInvoices.filter((i) => { 
+                const type = i.invoice_type || "INVOICE";
+                if (type !== "INVOICE") return false;
+                const n = i.customer_detail?.name || i.customer_name || ""; 
+                return n.toLowerCase().includes(q) || String(i.number).includes(q); 
+            });
+        }
+        if (tab === "quotations") {
+            return filteredInvoices.filter((i) => { 
+                const type = i.invoice_type || "INVOICE";
+                if (type !== "QUOTATION") return false;
+                const n = i.customer_detail?.name || i.customer_name || ""; 
+                return n.toLowerCase().includes(q) || String(i.number).includes(q); 
+            });
+        }
         if (tab === "stock") return products.filter((p) => p.name.toLowerCase().includes(q));
+        
         const salesMap = {};
-        filteredInvoices.forEach((inv) => inv.items?.forEach((it) => { const name = it.product_name || "Unknown"; salesMap[name] = (salesMap[name] || 0) + Number(it.qty || 0); }));
+        filteredInvoices.filter(i => (i.invoice_type || "INVOICE") === "INVOICE").forEach((inv) => inv.items?.forEach((it) => { 
+            const name = it.product_name || it.name || "Unknown"; 
+            salesMap[name] = (salesMap[name] || 0) + Number(it.qty || 0); 
+        }));
         return Object.entries(salesMap).map(([name, qty]) => ({ name, qty, price: products.find((p) => p.name === name)?.price || 0 })).filter((p) => p.name.toLowerCase().includes(q)).sort((a, b) => b.qty - a.qty);
     }, [invoices, products, fromDate, toDate, search, tab]);
 
     const metrics = useMemo(() => {
-        if (tab === "sales") return { card1: filteredData.reduce((s, i) => s + Number(i.grand_total || 0), 0), card2: filteredData.length };
+        if (tab === "sales" || tab === "quotations") return { card1: filteredData.reduce((s, i) => s + Number(i.grand_total || 0), 0), card2: filteredData.length };
         if (tab === "stock") return { card1: filteredData.reduce((s, p) => s + p.price * p.quantity, 0), card2: filteredData.filter((p) => Number(p.quantity) <= 5).length };
         return { card1: filteredData.reduce((s, p) => s + p.qty, 0), card2: filteredData[0] || { name: "N/A", qty: 0 } };
     }, [filteredData, tab]);
@@ -145,7 +165,12 @@ export default function Reports() {
                         )}
                     </div>
                     <div className="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
-                        {[{ id: "sales", label: "Revenue" }, { id: "stock", label: "Inventory" }, { id: "products", label: "Products" }].map((t) => (
+                        {[
+                            { id: "sales", label: "Revenue" }, 
+                            { id: "quotations", label: "Quotations" },
+                            { id: "stock", label: "Inventory" }, 
+                            { id: "products", label: "Products" }
+                        ].map((t) => (
                             <button key={t.id} onClick={() => { setTab(t.id); setSearch(""); }} className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-all ${tab === t.id ? "bg-slate-900 text-white shadow-md scale-105" : "bg-white text-slate-500 border border-slate-200"}`}>
                                 {t.label}
                             </button>
@@ -159,13 +184,13 @@ export default function Reports() {
                 {/* Stat Cards — 2 cols always, 4 on wide desktop */}
                 <div className="grid grid-cols-2 gap-2 sm:gap-4">
                     <StatCard
-                        title={tab === "sales" ? "Total Revenue" : tab === "stock" ? "Stock Value" : "Units Sold"}
+                        title={tab === "sales" ? "Total Revenue" : tab === "quotations" ? "Total Quotation" : tab === "stock" ? "Stock Value" : "Units Sold"}
                         value={tab === "products" ? metrics.card1 : formatCurrency(metrics.card1)}
                         isDark={true}
                         gradient={tab === "sales" ? "bg-gradient-to-br from-[#0A1A2F] to-[#0F172A]" : tab === "stock" ? "bg-gradient-to-br from-[#0F172A] to-[#1E1B4B]" : "bg-gradient-to-br from-[#155E75] to-[#1E3A8A]"}
-                        icon={tab === "sales" ? <TrendingUpIcon /> : tab === "stock" ? <CubeIcon /> : <StarIcon />}
+                        icon={tab === "sales" ? <TrendingUpIcon /> : tab === "quotations" ? <div className="text-white"><SearchIcon /></div> : tab === "stock" ? <CubeIcon /> : <StarIcon />}
                     />
-                    {tab === "sales"    && <StatCard title="Transactions"   value={metrics.card2}                       subtext="Invoices generated"  isDark={false} gradient="bg-gradient-to-br from-[#BFDBFE] to-[#67E8F9]"   icon={<div className="font-serif italic font-black text-xl">#</div>} />}
+                    {(tab === "sales" || tab === "quotations") && <StatCard title="Transactions"   value={metrics.card2}                       subtext="Count"  isDark={false} gradient="bg-gradient-to-br from-[#BFDBFE] to-[#67E8F9]"   icon={<div className="font-serif italic font-black text-xl">#</div>} />}
                     {tab === "stock"    && <StatCard title="Low Stock Alert" value={metrics.card2}                       subtext="Items below 5 qty"   isDark={false} gradient="bg-gradient-to-br from-[#C7D2FE] to-[#CBD5E1]"   icon={<AlertIcon />} />}
                     {tab === "products" && <StatCard title="Top Performer"   value={metrics.card2.name?.substring(0,12)} subtext={`${metrics.card2.qty} units sold`} isDark={false} gradient="bg-gradient-to-br from-[#F1F5F9] to-[#EFF6FF]" icon={<StarIcon />} />}
                 </div>
@@ -223,8 +248,8 @@ export default function Reports() {
                             return (
                                 <div
                                     key={i}
-                                    onClick={() => tab === "sales" && setSelectedInvoice(item)}
-                                    className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center transition-all ${tab === "sales" ? "cursor-pointer hover:border-indigo-200 hover:shadow-md active:scale-[0.98]" : ""}`}
+                                    onClick={() => (tab === "sales" || tab === "quotations") && setSelectedInvoice(item)}
+                                    className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center transition-all ${(tab === "sales" || tab === "quotations") ? "cursor-pointer hover:border-indigo-200 hover:shadow-md active:scale-[0.98]" : ""}`}
                                 >
                                     <div className="flex items-center gap-4 min-w-0">
                                         <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-sm font-bold shadow-inner flex-shrink-0 ${themeColor.bg} ${themeColor.text}`}>{initial}</div>
@@ -241,7 +266,7 @@ export default function Reports() {
                                         </p>
                                         {tab === "stock" && Number(item.quantity) <= 5 && <span className="inline-block mt-1 text-[9px] font-bold text-white bg-red-600 px-2 py-0.5 rounded">LOW</span>}
                                         {tab === "products" && i === 0 && <span className="inline-block mt-1 text-[9px] font-bold text-white bg-cyan-700 px-2 py-0.5 rounded">#1</span>}
-                                        {tab === "sales" && <p className="text-[9px] text-indigo-400 font-bold mt-1">VIEW →</p>}
+                                        {(tab === "sales" || tab === "quotations") && <p className="text-[9px] text-indigo-400 font-bold mt-1">VIEW →</p>}
                                     </div>
                                 </div>
                             );

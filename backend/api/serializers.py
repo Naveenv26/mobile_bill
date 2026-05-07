@@ -109,12 +109,16 @@ class CustomerSerializer(serializers.ModelSerializer):
 # ============================
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source='product.name', read_only=True)
+    # product_name is now a field in the model, but we also want to fall back to product.name if available
+    display_name = serializers.SerializerMethodField()
     
     class Meta:
         model = InvoiceItem
-        fields = ("id", "product", "product_name", "qty", "unit_price", "tax_rate")
-        read_only_fields = ("id", "product_name")
+        fields = ("id", "product", "product_name", "display_name", "qty", "unit_price", "tax_rate")
+        read_only_fields = ("id", "display_name")
+
+    def get_display_name(self, obj):
+        return obj.product_name or (obj.product.name if obj.product else "Unknown Item")
 
 class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True)
@@ -126,7 +130,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = (
             "id", "shop", "customer", "customer_detail", "customer_name", "customer_mobile",
-            "created_at", "subtotal", "tax_total", "grand_total","discount_total", "status", "items",
+            "created_at", "subtotal", "tax_total", "grand_total","discount_total", "status", "invoice_type", "items",
             "invoice_date", "number", "payment_mode"
         )
         read_only_fields = (
@@ -141,11 +145,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
         shop = instance.shop
         discount_amount = validated_data.get("discount_total", instance.discount_total)
 
-        # 1. Revert stock for old items
-        for old_item in instance.items.all():
-            Product.objects.filter(id=old_item.product_id).update(
-                quantity=F('quantity') + old_item.qty
-            )
+        # 1. Revert stock for old items (Only for INVOICES)
+        if instance.invoice_type == 'INVOICE':
+            for old_item in instance.items.all():
+                Product.objects.filter(id=old_item.product_id).update(
+                    quantity=F('quantity') + old_item.qty
+                )
         
         # 2. Clear old items
         instance.items.all().delete()
@@ -154,6 +159,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         instance.customer_name = validated_data.get("customer_name", instance.customer_name)
         instance.customer_mobile = validated_data.get("customer_mobile", instance.customer_mobile)
         instance.payment_mode = validated_data.get('payment_mode', instance.payment_mode)
+        instance.invoice_type = validated_data.get('invoice_type', instance.invoice_type)
         instance.discount_total = discount_amount
 
         # Handle Customer re-association if mobile changed
@@ -169,7 +175,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
         tax_calc = 0
 
         for item_data in items_data:
-            prod = item_data['product']
+            prod = item_data.get('product')
+            p_name = item_data.get('product_name')
             qty = item_data['qty']
             price = item_data['unit_price']
             tax = item_data.get('tax_rate', 0)
@@ -182,14 +189,20 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
             # Create the item
             InvoiceItem.objects.create(
-                invoice=instance, product=prod, qty=qty, unit_price=price,
-                tax_rate=tax, line_total=line_total + line_tax
+                invoice=instance, 
+                product=prod, 
+                product_name=p_name or (prod.name if prod else None),
+                qty=qty, 
+                unit_price=price,
+                tax_rate=tax, 
+                line_total=line_total + line_tax
             )
 
-            # Deduct stock
-            Product.objects.filter(id=prod.id).update(
-                quantity=F('quantity') - qty
-            )
+            # Deduct stock (Only for INVOICES and only if product is linked)
+            if instance.invoice_type == 'INVOICE' and prod:
+                Product.objects.filter(id=prod.id).update(
+                    quantity=F('quantity') - qty
+                )
 
         # 5. Save Final Totals
         instance.subtotal = total_calc
@@ -228,7 +241,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             customer=customer,
             customer_name=c_name,
             customer_mobile=c_mobile,
-            status="PAID",
+            status=validated_data.get('status', "PAID"),
+            invoice_type=validated_data.get('invoice_type', "INVOICE"),
             number=formatted_number,
             payment_mode=validated_data.get('payment_mode', 'cash'),
             created_by=request.user,
@@ -241,7 +255,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
         tax_calc = 0
 
         for item in items_data:
-            prod = item['product']
+            prod = item.get('product')
+            p_name = item.get('product_name')
             qty = item['qty']
             price = item['unit_price']
             tax = item.get('tax_rate', 0)
@@ -253,14 +268,20 @@ class InvoiceSerializer(serializers.ModelSerializer):
             tax_calc += line_tax
 
             InvoiceItem.objects.create(
-                invoice=invoice, product=prod, qty=qty, unit_price=price,
-                tax_rate=tax, line_total=line_total + line_tax
+                invoice=invoice, 
+                product=prod, 
+                product_name=p_name or (prod.name if prod else None),
+                qty=qty, 
+                unit_price=price,
+                tax_rate=tax, 
+                line_total=line_total + line_tax
             )
 
-            # ✅ Deduct stock atomically
-            Product.objects.filter(id=prod.id).update(
-                quantity=F('quantity') - qty
-            )
+            # ✅ Deduct stock atomically (Only for INVOICES and only if product is linked)
+            if invoice.invoice_type == 'INVOICE' and prod:
+                Product.objects.filter(id=prod.id).update(
+                    quantity=F('quantity') - qty
+                )
 
         # 5. Save Final Totals
         invoice.subtotal = total_calc

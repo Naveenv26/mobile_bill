@@ -30,6 +30,7 @@ export const createInvoice = async (data) => {
     customer_mobile: data.customer_mobile || "",
     items: data.items.map((c) => ({
       product: c.product,
+      product_name: c.product_name,
       qty: c.qty,
       unit_price: c.unit_price,
       tax_rate: c.tax_rate,
@@ -38,6 +39,7 @@ export const createInvoice = async (data) => {
     tax_total: data.tax_total || 0,
     discount_total: data.discount_total || 0,
     grand_total: data.grand_total,
+    invoice_type: data.invoice_type || "INVOICE",
   };
   const res = await client.post("/invoices/", payload);
   return res.data;
@@ -72,6 +74,7 @@ export const updateInvoice = async (id, data) => {
     customer_mobile: data.customer_mobile,
     items: data.items.map((c) => ({
       product: c.product,
+      product_name: c.product_name,
       qty: c.qty,
       unit_price: c.unit_price,
       tax_rate: c.tax_rate,
@@ -80,6 +83,7 @@ export const updateInvoice = async (id, data) => {
     tax_total: data.tax_total || 0,
     discount_total: data.discount_total || 0,
     grand_total: data.grand_total,
+    invoice_type: data.invoice_type || "INVOICE",
     payment_mode: data.payment_mode || "cash",
   };
   const res = await client.put(`/invoices/${id}/`, payload);

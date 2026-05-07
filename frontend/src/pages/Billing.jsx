@@ -63,12 +63,15 @@ export default function Billing() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editInvoiceId, setEditInvoiceId] = useState(null);
   const [invoiceType, setInvoiceType] = useState("INVOICE");
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customItem, setCustomItem] = useState({ name: "", qty: 1, price: 0, tax_rate: 0 });
 
   const [currentShop, setCurrentShop] = useState(
     JSON.parse(localStorage.getItem("shop")) || { name: "My Shop", address: "", contact_phone: "", config: {} }
   );
 
   const { hasFeature } = useSubscription();
+  const onAndroid = isAndroidWebView();
   const nameRef = useRef();
   const searchRef = useRef();
 
@@ -165,6 +168,26 @@ export default function Billing() {
     searchRef.current?.focus();
   };
 
+  const addCustomToCart = () => {
+    if (!customItem.name || customItem.price <= 0) {
+      toast.error("Enter item name and price");
+      return;
+    }
+    const newItem = {
+      id: `custom-${Date.now()}`,
+      name: customItem.name,
+      price: Number(customItem.price),
+      qty: Number(customItem.qty),
+      tax_rate: Number(customItem.tax_rate),
+      isCustom: true,
+      stock: 999999
+    };
+    setCart((prev) => [...prev, newItem]);
+    setCustomItem({ name: "", qty: 1, price: 0, tax_rate: 0 });
+    setShowCustomForm(false);
+    toast.success("Custom item added");
+  };
+
   const updateQty = (id, newQty) => {
     if (newQty <= 0) { setCart((prev) => prev.filter((c) => c.id !== id)); return; }
     setCart((prev) => {
@@ -208,7 +231,8 @@ export default function Billing() {
         customer_name: customerName || "Walk-in",
         customer_mobile: customerMobile || "",
         items: cart.map((c) => ({
-          product: c.id,
+          product: c.isCustom ? null : c.id,
+          product_name: c.name,
           qty: c.qty,
           unit_price: c.price,
           tax_rate: applyTax ? (c.tax_rate || 0) : 0,
@@ -227,18 +251,27 @@ export default function Billing() {
         res = await createInvoice(payload);
       }
       
-      const responseData = res.data || res;
+      // Axios or our wrapper might return data directly or in .data
+      const responseData = res?.data || res;
+      if (!responseData || typeof responseData !== "object") {
+         throw new Error("Invalid response from server");
+      }
+
       const finalInvoiceData = {
         ...responseData,
         customer_name: responseData.customer_name || customerName || "Walk-in",
         customer_mobile: responseData.customer_mobile || customerMobile || "",
+        grand_total: responseData.grand_total ?? total, // Fallback to local total if missing
       };
+
       setInvoiceData(finalInvoiceData);
       setShowSuccessModal(true);
       setIsCartOpen(false);
+      toast.success(invoiceType === "QUOTATION" ? "Quotation Saved!" : "Sale Confirmed!");
     } catch (err) {
       console.error("Invoice Error:", err);
-      toast.error(err.response?.data?.message || "Failed to process invoice");
+      const msg = err.response?.data?.message || err.message || "Failed to process invoice";
+      toast.error(msg);
     }
   };
 
@@ -293,7 +326,7 @@ export default function Billing() {
   doc.setFontSize(24);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(30, 41, 59);
-  doc.text("INVOICE", rightAlign, metaY, { align: "right" });
+  doc.text(printData.invoice_type === "QUOTATION" ? "QUOTATION" : "INVOICE", rightAlign, metaY, { align: "right" });
 
   doc.setFontSize(10);
   doc.setTextColor(80, 80, 80);
@@ -525,8 +558,8 @@ export default function Billing() {
           </div>
         </div>
 
-        <div className="px-3 pb-3">
-          <div className="relative group">
+        <div className="px-3 pb-3 flex gap-2">
+          <div className="relative group flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-indigo-500">
               <SearchIcon />
             </div>
@@ -539,7 +572,59 @@ export default function Billing() {
               className="block w-full pl-10 pr-4 py-2.5 border-none rounded-xl bg-white ring-1 ring-slate-200 placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all text-sm"
             />
           </div>
+          <button 
+            onClick={() => setShowCustomForm(!showCustomForm)}
+            className={`px-4 py-2.5 rounded-xl border-2 border-black font-bold text-xs uppercase tracking-tight shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all ${showCustomForm ? "bg-amber-100 text-amber-700" : "bg-white text-slate-700"}`}
+          >
+            {showCustomForm ? "Cancel" : "+ Custom"}
+          </button>
         </div>
+
+        {/* --- Custom Item Form --- */}
+        {showCustomForm && (
+          <div className="mx-3 mb-4 p-4 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 duration-300">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Add Custom Item</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <input
+                  type="text"
+                  placeholder="Item Name"
+                  value={customItem.name}
+                  onChange={(e) => setCustomItem({ ...customItem, name: e.target.value })}
+                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold placeholder:font-normal focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">PRICE</label>
+                <input
+                  type="number"
+                  placeholder="Price"
+                  value={customItem.price || ""}
+                  onChange={(e) => setCustomItem({ ...customItem, price: e.target.value })}
+                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">QTY</label>
+                <input
+                  type="number"
+                  placeholder="Qty"
+                  value={customItem.qty}
+                  onChange={(e) => setCustomItem({ ...customItem, qty: e.target.value })}
+                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="col-span-2">
+                <button
+                  onClick={addCustomToCart}
+                  className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all"
+                >
+                  Add to Cart
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* ── Product Grid ── */}
       <div className="px-3 py-3 max-w-7xl mx-auto">
@@ -792,9 +877,22 @@ export default function Billing() {
               </p>
 
               <div className="bg-slate-50 rounded-2xl p-4 mb-5 border-2 border-black text-left">
-                <div className="text-xs text-slate-500 mb-0.5">Bill No: <span className="font-mono font-bold text-slate-700">#{invoiceData.number || invoiceData.id}</span></div>
-                <div className="font-bold text-slate-800">{invoiceData.customer_name}</div>
-                <div className="text-2xl font-black text-indigo-600 mt-1">₹{Number(invoiceData.grand_total).toFixed(2)}</div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">
+                  {invoiceData.invoice_type || "INVOICE"} DETAILS
+                </div>
+                <div className="flex justify-between items-start mb-2">
+                   <div>
+                      <div className="text-xs text-slate-500 mb-0.5">Bill No: <span className="font-mono font-bold text-slate-700">#{invoiceData.number || invoiceData.id}</span></div>
+                      <div className="font-bold text-slate-800">{invoiceData.customer_name}</div>
+                   </div>
+                   <div className="text-right">
+                      <div className="text-[10px] text-slate-400 font-bold">{new Date().toLocaleDateString()}</div>
+                   </div>
+                </div>
+                <div className="pt-2 border-t border-slate-200 flex justify-between items-end">
+                   <span className="text-xs font-bold text-slate-500">Amount Due</span>
+                   <div className="text-2xl font-black text-indigo-600">₹{Number(invoiceData.grand_total || 0).toFixed(2)}</div>
+                </div>
               </div>
 
               <div className="space-y-3">

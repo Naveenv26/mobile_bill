@@ -1,15 +1,10 @@
 # backend/accounts/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, PhoneVerification
+from .models import User
 from api.models import UserSubscription # Import from the 'api' app
 
-@admin.register(PhoneVerification)
-class PhoneVerificationAdmin(admin.ModelAdmin):
-    list_display = ('phone', 'otp', 'is_verified', 'updated_at')
-    list_filter = ('is_verified',)
-    search_fields = ('phone', 'otp')
-    ordering = ('-updated_at',)
+# PhoneVerification admin removed
 
 # 1. Define an Inline admin for the UserSubscription
 # ... (rest of the code remains same)

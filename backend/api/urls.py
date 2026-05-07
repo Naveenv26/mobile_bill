@@ -20,9 +20,6 @@ from .views import (
     StaffViewSet,
     FeedbackViewSet,
     check_availability,
-    send_otp,
-    verify_otp,
-    admin_otp_logs,
 )
 
 # create_order imported from payment_views (the full, correct version)
@@ -77,9 +74,6 @@ urlpatterns = [
     # Auth
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/check-availability/', check_availability, name='check_availability'),
-    path('auth/send-otp/', send_otp, name='send_otp'),
-    path('auth/verify-otp/', verify_otp, name='verify_otp'),
-    path('auth/admin-otp-logs/', admin_otp_logs, name='admin_otp_logs'),
     path('auth/login/', CookieTokenObtainPairView.as_view(), name='login'),
     path("auth/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
     path("auth/logout/", logout_view, name="logout"),

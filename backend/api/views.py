@@ -38,11 +38,7 @@ from .serializers import (
 
 # Staff serializer import from accounts
 from accounts.serializers import StaffSerializer
-import random
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from accounts.models import PhoneVerification
+from accounts.serializers import StaffSerializer
 
 
 @api_view(['POST'])
@@ -65,75 +61,7 @@ def check_availability(request):
             
     return Response({"message": "Available"})
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def send_otp(request):
-    phone = request.data.get('phone')
-    if not phone or len(phone) != 10:
-        return Response({"error": "Invalid 10-digit phone number."}, status=400)
-    
-    otp = str(random.randint(100000, 999999))
-    obj, _ = PhoneVerification.objects.update_or_create(
-        phone=phone,
-        defaults={'otp': otp, 'is_verified': False}
-    )
-    
-    # Send SMS via Brevo API
-    api_key = getattr(settings, 'BREVO_API_KEY', None)
-    if api_key and api_key != 'YOUR_BREVO_API_KEY_HERE':
-        import requests
-        url = "https://api.brevo.com/v3/transactionalSMS/sms"
-        payload = {
-            "type": "transactional",
-            "unicodeEnabled": True,
-            "sender": "SPARKB",  # Max 11 characters
-            "recipient": f"+91{phone}",
-            "content": f"Your SparkBill verification code is: {otp}. Valid for 5 minutes."
-        }
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-            "api-key": api_key
-        }
-        try:
-            response = requests.post(url, json=payload, headers=headers)
-            if response.status_code not in [200, 201]:
-                print(f"Brevo SMS Error: {response.text}")
-        except Exception as e:
-            print(f"SMS Exception: {str(e)}")
-
-    print(f"--- OTP for {phone}: {otp} ---") 
-    
-    return Response({"message": "OTP sent successfully!"})
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def admin_otp_logs(request):
-    if request.user.role != 'SITE_ADMIN':
-        return Response({"error": "Unauthorized"}, status=403)
-    
-    logs = PhoneVerification.objects.all().order_by('-updated_at')[:50]
-    data = [{
-        "phone": l.phone,
-        "otp": l.otp,
-        "verified": l.is_verified,
-        "time": l.updated_at
-    } for l in logs]
-    return Response(data)
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def verify_otp(request):
-    phone = request.data.get('phone')
-    otp = request.data.get('otp')
-    
-    try:
-        verify = PhoneVerification.objects.get(phone=phone, otp=otp)
-        verify.is_verified = True
-        verify.save()
-        return Response({"message": "Phone verified successfully!", "verified": True})
-    except PhoneVerification.DoesNotExist:
-        return Response({"error": "Invalid OTP."}, status=400)
+# OTP views removed
 
 # Models (from *THIS* app - 'api')
 from .models import SubscriptionPlan, Payment, UserSubscription
@@ -251,29 +179,11 @@ class InvoiceViewSet(ShopFilteredViewSet):
         user = self.request.user
         shop = user.shop
 
-        # Save invoice first
-        invoice = serializer.save(
+        # Serializer.create now handles stock deduction and totals calculation
+        serializer.save(
             shop=shop,
             created_by=user
         )
-
-        # ✅ Deduct stock atomically for each item
-        for item in invoice.items.select_related('product').all():
-            updated = Product.objects.filter(
-                id=item.product_id,
-                shop=shop,
-                quantity__gte=item.qty       # only update if enough stock
-            ).update(
-                quantity=F('quantity') - item.qty
-            )
-
-            if updated == 0:
-                # Check if it's an oversell or race condition
-                product = Product.objects.get(id=item.product_id)
-                if product.quantity < item.qty:
-                    item.oversold = True      # ✅ mark as oversold
-                    item.save()
-                # Don't block the sale — just flag it
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
@@ -281,11 +191,12 @@ class InvoiceViewSet(ShopFilteredViewSet):
         # Lock the shop row during renumbering to prevent race conditions
         shop = Shop.objects.select_for_update().get(id=invoice.shop_id)
         
-        # 1. Revert stock
-        for item in invoice.items.all():
-            Product.objects.filter(id=item.product_id, shop=shop).update(
-                quantity=F('quantity') + item.qty
-            )
+        # 1. Revert stock (Only for INVOICES)
+        if invoice.invoice_type == 'INVOICE':
+            for item in invoice.items.all():
+                Product.objects.filter(id=item.product_id, shop=shop).update(
+                    quantity=F('quantity') + item.qty
+                )
         
         # 2. Identify the sequence number of the deleted invoice
         try:

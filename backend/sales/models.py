@@ -17,6 +17,7 @@ class Invoice(models.Model):
     invoice_date = models.DateTimeField(auto_now_add=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    invoice_type = models.CharField(max_length=20, choices=[('INVOICE', 'Invoice'), ('QUOTATION', 'Quotation')], default='INVOICE')
 
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -41,7 +42,8 @@ class Invoice(models.Model):
 
 class InvoiceItem(models.Model):
     invoice = models.ForeignKey(Invoice, related_name="items", on_delete=models.CASCADE)
-    product = models.ForeignKey('catalog.Product', on_delete=models.CASCADE)
+    product = models.ForeignKey('catalog.Product', on_delete=models.CASCADE, null=True, blank=True)
+    product_name = models.CharField(max_length=255, null=True, blank=True) # For custom items
     qty = models.DecimalField(max_digits=10, decimal_places=2)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
