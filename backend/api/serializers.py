@@ -145,6 +145,17 @@ class InvoiceSerializer(serializers.ModelSerializer):
         shop = instance.shop
         discount_amount = validated_data.get("discount_total", instance.discount_total)
 
+        # 0. Strict Rule: No downgrade from INVOICE to QUOTATION
+        new_type = validated_data.get('invoice_type', instance.invoice_type)
+        if instance.invoice_type == 'INVOICE' and new_type == 'QUOTATION':
+            raise serializers.ValidationError({"invoice_type": "Security Rule: Cannot change an Invoice back to a Quotation."})
+
+        # 0.1 Strict Rule: No custom items in INVOICE
+        if new_type == 'INVOICE':
+            for item in items_data:
+                if not item.get('product'):
+                     raise serializers.ValidationError({"items": "Sales Invoices must only contain catalog products. Custom items are only allowed for Quotations."})
+
         # 1. Revert stock for old items (Only for INVOICES)
         if instance.invoice_type == 'INVOICE':
             for old_item in instance.items.all():
@@ -236,6 +247,14 @@ class InvoiceSerializer(serializers.ModelSerializer):
             )
 
         # 3. Create Invoice (Totals 0 initially)
+        inv_type = validated_data.get('invoice_type', 'INVOICE')
+        
+        # Strict Rule: No custom items in INVOICE
+        if inv_type == 'INVOICE':
+            for item in items_data:
+                if not item.get('product'):
+                     raise serializers.ValidationError({"items": "Sales Invoices must only contain catalog products. Custom items are only allowed for Quotations."})
+
         invoice = Invoice.objects.create(
             shop=shop,
             customer=customer,

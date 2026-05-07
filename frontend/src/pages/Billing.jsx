@@ -63,6 +63,7 @@ export default function Billing() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editInvoiceId, setEditInvoiceId] = useState(null);
   const [invoiceType, setInvoiceType] = useState("INVOICE");
+  const [originalType, setOriginalType] = useState(null);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customItem, setCustomItem] = useState({ name: "", qty: 1, price: 0, tax_rate: 0 });
 
@@ -84,7 +85,9 @@ export default function Billing() {
       const { invoiceId, initialCart, initialCustomer, initialDiscount, initialPaymentMode } = location.state;
       setIsEditMode(true);
       setEditInvoiceId(invoiceId);
-      setInvoiceType(location.state?.invoiceType || "INVOICE");
+      const type = location.state?.invoiceType || "INVOICE";
+      setInvoiceType(type);
+      setOriginalType(type);
       
       // Load initial data
       setCart(initialCart.map(it => ({
@@ -518,67 +521,90 @@ export default function Billing() {
         </div>
 
         {/* --- Document Type Selection (Dropdown) --- */}
-        <div className="px-3 pb-2">
+        <div className="px-4 pb-4">
           <div className="relative">
             <select
               value={invoiceType}
+              disabled={isEditMode && originalType === "INVOICE"}
               onChange={(e) => setInvoiceType(e.target.value)}
               className={`
-                w-full appearance-none bg-white border-2 border-black rounded-xl px-4 py-2.5 text-sm font-bold uppercase tracking-tight shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all
-                ${invoiceType === "QUOTATION" ? "text-amber-600 border-amber-500" : "text-indigo-600 border-indigo-500"}
+                w-full appearance-none bg-white border-2 border-black rounded-xl px-4 py-3.5 text-sm font-black uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all
+                ${isEditMode && originalType === "INVOICE" ? "opacity-75 grayscale cursor-not-allowed" : "hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"}
+                ${invoiceType === "QUOTATION" ? "text-amber-600 border-amber-500 bg-amber-50/30" : "text-indigo-600 border-indigo-500 bg-indigo-50/30"}
               `}
             >
               <option value="INVOICE">📄 Sales Invoice</option>
               <option value="QUOTATION">📝 Quotation / Estimate</option>
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
-              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
           </div>
+          {isEditMode && originalType === "INVOICE" && (
+            <p className="text-[10px] font-black text-slate-400 mt-2 px-1 uppercase tracking-widest italic flex items-center gap-1">
+              <span className="w-1 h-1 bg-slate-300 rounded-full" /> Locked as Sales Invoice
+            </p>
+          )}
+          {isEditMode && originalType === "QUOTATION" && invoiceType === "INVOICE" && (
+            <p className="text-[10px] font-black text-indigo-500 mt-2 px-1 uppercase tracking-widest italic flex items-center gap-1 animate-pulse">
+               Converting to Sale... Stock will be deducted
+            </p>
+          )}
         </div>
 
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-4 flex gap-3">
+          <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center px-3 gap-2">
+            <span className="text-[10px] font-bold text-slate-400">TO:</span>
             <input
               ref={nameRef}
               type="text"
-              placeholder="Name"
+              placeholder="Customer Name"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="flex-grow bg-white border-none rounded-xl px-2.5 py-2 text-sm font-medium placeholder:text-[10px] sm:placeholder:text-sm focus:ring-2 focus:ring-indigo-500 shadow-sm min-w-0"
+              className="w-full bg-transparent border-none py-2 text-sm font-bold focus:ring-0 placeholder:font-normal"
             />
+          </div>
+          <div className="w-32 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center px-3 gap-2">
+            <span className="text-[10px] font-bold text-slate-400">PH:</span>
             <input
               type="tel"
               placeholder="Mobile"
               value={customerMobile}
               onChange={(e) => setCustomerMobile(e.target.value)}
-              className="w-24 bg-white border-none rounded-xl px-2.5 py-2 text-sm font-medium placeholder:text-[10px] sm:placeholder:text-sm focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              className="w-full bg-transparent border-none py-2 text-sm font-bold focus:ring-0 placeholder:font-normal"
             />
           </div>
         </div>
+      </div>
 
-        <div className="px-3 pb-3 flex gap-2">
+      {/* --- Action Bar (Search & Custom) --- */}
+      <div className="px-4 py-5 bg-white border-b border-slate-100 flex flex-col gap-4">
+        <div className="flex gap-3">
           <div className="relative group flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-indigo-500">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none group-focus-within:text-indigo-500 transition-colors">
               <SearchIcon />
             </div>
             <input
               ref={searchRef}
               type="text"
-              placeholder="Search products..."
+              placeholder="Search items to add..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="block w-full pl-10 pr-4 py-2.5 border-none rounded-xl bg-white ring-1 ring-slate-200 placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all text-sm"
+              className="block w-full pl-11 pr-4 py-3.5 border-none rounded-2xl bg-slate-50 shadow-inner placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm font-bold"
             />
           </div>
-          <button 
-            onClick={() => setShowCustomForm(!showCustomForm)}
-            className={`px-4 py-2.5 rounded-xl border-2 border-black font-bold text-xs uppercase tracking-tight shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all ${showCustomForm ? "bg-amber-100 text-amber-700" : "bg-white text-slate-700"}`}
-          >
-            {showCustomForm ? "Cancel" : "+ Custom"}
-          </button>
+          {invoiceType === "QUOTATION" && (
+            <button 
+              onClick={() => setShowCustomForm(!showCustomForm)}
+              className={`px-6 py-3.5 rounded-2xl border-2 border-black font-black text-[11px] uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all flex-shrink-0 ${showCustomForm ? "bg-amber-400 text-black" : "bg-white text-slate-800"}`}
+            >
+              {showCustomForm ? "CLOSE" : "+ CUSTOM"}
+            </button>
+          )}
         </div>
+      </div>
 
         {/* --- Custom Item Form --- */}
         {showCustomForm && (
