@@ -136,21 +136,19 @@ export default function Reports() {
         if (tab === "sales" || tab === "quotations") {
             let totalRev = 0;
             let totalProfit = 0;
-            filteredInvoices.forEach(inv => {
-                if ((inv.invoice_type || "INVOICE") === (tab === "sales" ? "INVOICE" : "QUOTATION")) {
-                    totalRev += Number(inv.grand_total || 0);
-                    (inv.items || []).forEach(it => {
-                        const cost = Number(it.cost_price || 0);
-                        const rev = Number(it.line_total || 0);
-                        totalProfit += (rev - (cost * Number(it.qty || 0)));
-                    });
-                }
+            filteredData.forEach(inv => {
+                totalRev += Number(inv.grand_total || 0);
+                (inv.items || []).forEach(it => {
+                    const cost = Number(it.cost_price || 0);
+                    const rev = Number(it.line_total || 0);
+                    totalProfit += (rev - (cost * Number(it.qty || 0)));
+                });
             });
             return { card1: totalRev, card2: filteredData.length, profit: totalProfit };
         }
         if (tab === "stock") return { card1: filteredData.reduce((s, p) => s + p.price * p.quantity, 0), card2: filteredData.filter((p) => Number(p.quantity) <= 5).length };
         return { card1: filteredData.reduce((s, p) => s + p.qty, 0), card2: filteredData[0] || { name: "N/A", qty: 0 } };
-    }, [filteredData, tab, filteredInvoices]);
+    }, [filteredData, tab]);
 
     const chartData = useMemo(() => {
         if (tab === "sales" || tab === "quotations") {
