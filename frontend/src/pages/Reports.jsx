@@ -163,7 +163,7 @@ export default function Reports() {
     if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 text-sm animate-pulse">Loading Data...</div>;
 
     return (
-        <div className="w-full bg-[#F8FAFC] min-h-screen font-sans pb-24 overflow-x-hidden">
+        <div className="w-full max-w-[100vw] bg-[#F8FAFC] min-h-screen font-sans pb-24 overflow-x-hidden">
             {/* Header */}
             <div className="sticky top-0 z-30 w-full bg-white/90 backdrop-blur-md border-b border-gray-100">
                 <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-3">
@@ -207,7 +207,7 @@ export default function Reports() {
                 </div>
 
                 {/* Chart */}
-                <div className="bg-white rounded-3xl p-1 shadow-xl shadow-slate-100 border border-slate-100 overflow-hidden">
+                <div className="bg-white rounded-3xl p-1 shadow-xl shadow-slate-100 border border-slate-100 overflow-hidden w-full min-w-0">
                     <div className="p-5 pb-0">
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Overview</p>
                         <h2 className="text-xl font-black text-slate-800">Performance Trend</h2>
@@ -236,14 +236,14 @@ export default function Reports() {
 
                 {/* Date Filters */}
                 {tab === "sales" && (
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
-                            <div className="flex items-center gap-2"><CalendarIcon /><span className="text-[10px] font-bold text-slate-400">FROM</span></div>
-                            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="text-[10px] bg-transparent outline-none text-slate-600 font-bold" />
+                    <div className="flex flex-col gap-2 w-full min-w-0">
+                        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-2 sm:px-3 py-2 shadow-sm gap-2">
+                            <div className="flex items-center gap-1 shrink-0"><CalendarIcon /><span className="text-[10px] font-bold text-slate-400">FROM</span></div>
+                            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="text-[10px] bg-transparent outline-none text-slate-600 font-bold flex-1 min-w-0 text-right" />
                         </div>
-                        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
-                            <div className="flex items-center gap-2"><CalendarIcon /><span className="text-[10px] font-bold text-slate-400">TO</span></div>
-                            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="text-[10px] bg-transparent outline-none text-slate-600 font-bold" />
+                        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-2 sm:px-3 py-2 shadow-sm gap-2">
+                            <div className="flex items-center gap-1 shrink-0"><CalendarIcon /><span className="text-[10px] font-bold text-slate-400">TO</span></div>
+                            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="text-[10px] bg-transparent outline-none text-slate-600 font-bold flex-1 min-w-0 text-right" />
                         </div>
                     </div>
                 )}
