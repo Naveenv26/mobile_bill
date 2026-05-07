@@ -323,7 +323,7 @@ export default function Billing() {
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(30, 41, 59);
-  doc.text(currentShop.name.toUpperCase(), margin, currentY);
+  doc.text((currentShop?.name || "SparkBill Shop").toUpperCase(), margin, currentY);
   
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
@@ -425,7 +425,17 @@ export default function Billing() {
     doc.setFontSize(10);
   };
 
-  drawTotalRow("Subtotal:", Number(printData.subtotal).toFixed(2));
+  const isQuote = printData.invoice_type === "QUOTATION";
+  const subtotalValue = Number(printData.subtotal).toFixed(2);
+  drawTotalRow("Subtotal:", subtotalValue);
+  
+  // If Quotation with discount, draw a strikethrough over Subtotal
+  if (isQuote && Number(printData.discount_total) > 0) {
+    const textWidth = doc.getTextWidth(subtotalValue);
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.3);
+    doc.line(rightAlign - textWidth, finalY - 8, rightAlign, finalY - 8); 
+  }
   
   if (Number(printData.discount_total) > 0) {
     doc.setTextColor(220, 38, 38);
@@ -961,20 +971,26 @@ export default function Billing() {
       {/* ── Success Modal ── */}
       {showSuccessModal && invoiceData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl relative overflow-hidden border border-slate-100">
+          <div className="bg-white w-full max-w-sm rounded-[20px] p-8 text-center shadow-2xl relative overflow-hidden border border-slate-100">
             <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-50/50 rounded-full -translate-x-12 -translate-y-12 z-0 blur-2xl" />
             
             <div className="relative z-10">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-8 h-8 text-green-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
 
               <h2 className="text-2xl font-extrabold text-slate-800 mb-0.5">
-                {isEditMode ? "Update Complete!" : "Sale Complete!"}
+                {isEditMode 
+                  ? "Update Complete!" 
+                  : (invoiceData.invoice_type === "QUOTATION" ? "Quotation Created!" : "Sale Complete!")
+                }
               </h2>
               <p className="text-slate-400 text-sm mb-4">
-                {isEditMode ? "Invoice updated successfully" : "Invoice saved successfully"}
+                {isEditMode 
+                  ? "Document updated successfully" 
+                  : (invoiceData.invoice_type === "QUOTATION" ? "Quotation saved successfully" : "Invoice saved successfully")
+                }
               </p>
 
               <div className="bg-slate-50 rounded-2xl p-4 mb-5 border-2 border-black text-left">

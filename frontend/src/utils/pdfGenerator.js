@@ -149,10 +149,19 @@ export const generateThermalPDF = async (printData, currentShop) => {
     const subtotal = Number(printData.subtotal || 0);
     const total    = Number(printData.grand_total || 0);
 
+    const subVal = subtotal.toFixed(2);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.text("Subtotal:", 44, finalY);
-    doc.text(`${subtotal.toFixed(2)}`, rx, finalY, { align: "right" });
+    doc.text(subVal, rx, finalY, { align: "right" });
+
+    // Strikethrough for Quotation subtotal if discount exists
+    if (isQuote && discount > 0) {
+        const tw = doc.getTextWidth(subVal);
+        doc.setDrawColor(150, 150, 150);
+        doc.line(rx - tw, finalY - 1, rx, finalY - 1);
+    }
+    doc.setDrawColor(0, 0, 0);
 
     if (discount > 0) {
         finalY += 5;

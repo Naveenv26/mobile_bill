@@ -122,8 +122,8 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
 class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True)
-    customer_name = serializers.CharField(allow_blank=True, required=False, write_only=True)
-    customer_mobile = serializers.CharField(allow_blank=True, required=False, write_only=True)
+    customer_name = serializers.CharField(allow_blank=True, required=False)
+    customer_mobile = serializers.CharField(allow_blank=True, required=False)
     customer_detail = CustomerSerializer(source="customer", read_only=True)
     discount_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0)
     class Meta:
