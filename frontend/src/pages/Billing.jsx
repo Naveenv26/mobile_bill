@@ -626,74 +626,74 @@ export default function Billing() {
 
         {/* --- Custom Item Form --- */}
         {showCustomForm && (
-          <div className="mx-3 mb-4 p-4 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 duration-300">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Add Custom Item</h3>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="mx-2 sm:mx-3 mb-4 p-3 sm:p-4 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Add Custom Item / Box</h3>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <div className="col-span-2">
                 <input
                   type="text"
                   placeholder="Item Name"
                   value={customItem.name}
                   onChange={(e) => setCustomItem({ ...customItem, name: e.target.value })}
-                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold placeholder:font-normal focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 sm:px-4 py-2.5 text-sm font-bold placeholder:font-normal focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">PRICE</label>
+                <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">Price</label>
                 <input
                   type="number"
                   placeholder="0.00"
                   value={customItem.price || ""}
                   onChange={(e) => setCustomItem({ ...customItem, price: e.target.value })}
-                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">DISCOUNTED</label>
+                <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">Final</label>
                 <input
                   type="number"
-                  placeholder="Final Price"
+                  placeholder="Final"
                   value={customItem.discounted_price || ""}
                   onChange={(e) => setCustomItem({ ...customItem, discounted_price: e.target.value })}
-                  className="w-full bg-emerald-50 text-emerald-700 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500"
+                  className="w-full bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">TAX %</label>
-                <div className="flex gap-2">
+              <div className="col-span-2">
+                <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">Tax % & Mode</label>
+                <div className="flex items-stretch gap-1">
                   <input
                     type="number"
                     placeholder="Rate"
                     value={customItem.tax_rate || ""}
                     onChange={(e) => setCustomItem({ ...customItem, tax_rate: e.target.value })}
-                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
                   />
                   <button
                     onClick={() => setCustomItem({ ...customItem, is_tax_inclusive: !customItem.is_tax_inclusive })}
-                    className={`px-3 rounded-xl border-2 font-black text-[9px] uppercase tracking-tighter transition-all ${customItem.is_tax_inclusive ? "bg-emerald-500 border-emerald-600 text-white" : "bg-white border-slate-200 text-slate-400"}`}
+                    className={`px-3 rounded-xl border-2 font-black text-[8px] uppercase tracking-tighter transition-all flex items-center justify-center min-w-[50px] ${customItem.is_tax_inclusive ? "bg-emerald-500 border-emerald-600 text-white" : "bg-white border-slate-300 text-slate-400"}`}
                   >
                     {customItem.is_tax_inclusive ? "INC" : "EXC"}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">BOXES (QTY)</label>
+                <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">Boxes</label>
                 <input
                   type="number"
-                  placeholder="Count"
+                  placeholder="0"
                   value={customItem.qty}
                   onChange={(e) => setCustomItem({ ...customItem, qty: e.target.value })}
-                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-1 ml-1">UNITS / BOX</label>
+                <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">Units/Box</label>
                 <input
                   type="number"
-                  placeholder="Multiplier"
+                  placeholder="1"
                   value={customItem.units_per_box}
                   onChange={(e) => setCustomItem({ ...customItem, units_per_box: e.target.value })}
-                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
