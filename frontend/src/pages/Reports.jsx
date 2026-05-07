@@ -166,7 +166,7 @@ export default function Reports() {
         <div className="w-full max-w-[100vw] bg-[#F8FAFC] min-h-screen font-sans pb-24 overflow-x-hidden">
             {/* Header */}
             <div className="sticky top-0 z-30 w-full bg-white/90 backdrop-blur-md border-b border-gray-100">
-                <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-3">
+                <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-3">
                     <div className="flex justify-between items-center mb-3">
                         <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Analytics</h1>
                         {hasFeature("export") && (
@@ -190,7 +190,7 @@ export default function Reports() {
                 </div>
             </div>
 
-            <div className="w-full px-2 sm:px-6 pt-4 space-y-4">
+            <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4 space-y-4">
 
                 {/* Stat Cards — Stack on 320px, 2 cols on tablet+ */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -213,7 +213,7 @@ export default function Reports() {
                         <h2 className="text-xl font-black text-slate-800">Performance Trend</h2>
                     </div>
                     <div className="h-48 sm:h-64 w-full mt-2">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="99%" height="100%">
                             {tab === "sales" ? (
                                 <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -35, bottom: 0 }}>
                                     <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={themeColor.hex} stopOpacity={0.3}/><stop offset="95%" stopColor={themeColor.hex} stopOpacity={0}/></linearGradient></defs>
