@@ -163,11 +163,10 @@ export default function Reports() {
     if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 text-sm animate-pulse">Loading Data...</div>;
 
     return (
-        <div className="w-full bg-slate-100 min-h-screen font-sans">
-            <div className="max-w-[320px] mx-auto bg-[#F8FAFC] min-h-screen relative overflow-x-hidden pb-24 shadow-2xl border-x border-slate-200">
-                {/* Header */}
-                <div className="sticky top-0 z-30 w-full bg-white/90 backdrop-blur-md border-b border-gray-100">
-                    <div className="w-full px-3 py-3">
+        <div className="w-full bg-[#F8FAFC] min-h-screen font-sans pb-24 overflow-x-hidden">
+            {/* Header */}
+            <div className="sticky top-0 z-30 w-full bg-white/90 backdrop-blur-md border-b border-gray-100">
+                <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-3">
                     <div className="flex justify-between items-center mb-3">
                         <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Analytics</h1>
                         {hasFeature("export") && (
@@ -301,7 +300,6 @@ export default function Reports() {
             {selectedInvoice && <InvoiceModal invoice={selectedInvoice} shop={currentShop} onUpdate={loadInvoices} onClose={() => setSelectedInvoice(null)} />}
 
             <style>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
-            </div>
         </div>
     );
 }
