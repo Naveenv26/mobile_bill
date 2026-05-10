@@ -48,6 +48,7 @@ class InvoiceItem(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     cost_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     line_total = models.DecimalField(max_digits=12, decimal_places=2)
 
     # ✅ new field

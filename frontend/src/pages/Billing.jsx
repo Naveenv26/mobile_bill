@@ -98,6 +98,7 @@ export default function Billing() {
         id: it.product,
         name: it.product_name,
         price: it.unit_price,
+        original_price: it.original_price,
         tax_rate: it.tax_rate,
         qty: it.qty,
         stock: 999999 // In edit mode, we temporarily ignore stock since we don't know the exact current stock vs previous sale qty yet
@@ -205,15 +206,18 @@ export default function Billing() {
 
     // Handle Inclusive Tax: Back-calculate base price
     // If inclusive, finalPrice is the "Total per Unit". 
-    // We need unit_price such that: unit_price + (unit_price * taxRate / 100) = finalPrice
+    let origPrice = Number(customItem.price);
+    
     if (customItem.is_tax_inclusive && taxRate > 0) {
       finalPrice = finalPrice / (1 + taxRate / 100);
+      origPrice = origPrice / (1 + taxRate / 100);
     }
 
     const newItem = {
       id: `custom-${Date.now()}`,
       name: customItem.name,
       price: finalPrice,
+      original_price: Number(customItem.discounted_price) > 0 ? origPrice : null,
       qty: totalQty,
       tax_rate: taxRate,
       isCustom: true,
@@ -272,6 +276,7 @@ export default function Billing() {
           product_name: c.name,
           qty: c.qty,
           unit_price: c.price,
+          original_price: c.original_price,
           tax_rate: applyTax ? (c.tax_rate || 0) : 0,
         })),
         subtotal,

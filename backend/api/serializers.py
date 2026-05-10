@@ -114,7 +114,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = InvoiceItem
-        fields = ("id", "product", "product_name", "display_name", "qty", "unit_price", "tax_rate")
+        fields = ("id", "product", "product_name", "display_name", "qty", "unit_price", "original_price", "tax_rate")
         read_only_fields = ("id", "display_name")
 
     def get_display_name(self, obj):
@@ -190,6 +190,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             p_name = item_data.get('product_name')
             qty = item_data['qty']
             price = item_data['unit_price']
+            orig_price = item_data.get('original_price')
             tax = item_data.get('tax_rate', 0)
 
             line_total = price * qty
@@ -205,6 +206,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 product_name=p_name or (prod.name if prod else None),
                 qty=qty, 
                 unit_price=price,
+                original_price=orig_price,
                 tax_rate=tax, 
                 cost_price=prod.cost_price if prod else 0,
                 line_total=line_total + line_tax
@@ -289,6 +291,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             p_name = item.get('product_name')
             qty = item['qty']
             price = item['unit_price']
+            orig_price = item.get('original_price')
             tax = item.get('tax_rate', 0)
 
             line_total = price * qty
@@ -303,6 +306,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 product_name=p_name or (prod.name if prod else None),
                 qty=qty, 
                 unit_price=price,
+                original_price=orig_price,
                 tax_rate=tax, 
                 line_total=line_total + line_tax
             )

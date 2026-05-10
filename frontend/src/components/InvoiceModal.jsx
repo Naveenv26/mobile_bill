@@ -222,14 +222,23 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
   doc.text(`Date: ${new Date(baseDate).toLocaleDateString()}`, pageW - margin, startY + 6, { align: "right" });
 
   // Items table
-  const tableRows = (invoice.items || []).map((item, i) => [
-    i + 1,
-    item.product_name || item.name || "Item",
-    Number(item.unit_price).toFixed(2),
-    item.qty,
-    `${item.tax_rate || 0}%`,
-    (Number(item.qty) * Number(item.unit_price)).toFixed(2),
-  ]);
+  const tableRows = (invoice.items || []).map((item, i) => {
+    const effPrice = Number(item.unit_price);
+    const origPrice = item.original_price ? Number(item.original_price) : effPrice;
+    const hasDiscount = origPrice > effPrice;
+    const origTot = origPrice * Number(item.qty);
+    const effTot = effPrice * Number(item.qty);
+
+    return [
+      i + 1,
+      item.product_name || item.name || "Item",
+      hasDiscount ? `${origPrice.toFixed(2)}\n${effPrice.toFixed(2)}` : effPrice.toFixed(2),
+      item.qty,
+      `${item.tax_rate || 0}%`,
+      hasDiscount ? `${origTot.toFixed(2)}\n${effTot.toFixed(2)}` : effTot.toFixed(2),
+    ];
+  });
+
   autoTable(doc, {
     startY: startY + 20,
     head: [["#", "Item Name", "Price", "Qty", "Tax %", "Total"]],
@@ -237,6 +246,18 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     margin: { left: margin, right: margin },
+    didDrawCell: function(data) {
+      if (data.section === 'body' && (data.column.index === 2 || data.column.index === 5)) {
+        if (data.cell.text && data.cell.text.length > 1) {
+          const text = data.cell.text[0];
+          const y = data.cell.y + 4;
+          const w = doc.getTextWidth(text);
+          doc.setDrawColor(200, 50, 50);
+          doc.setLineWidth(0.5);
+          doc.line(data.cell.x + 2, y, data.cell.x + 2 + w, y);
+        }
+      }
+    }
   });
 
   // Totals
@@ -349,6 +370,7 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
           product_name: it.product_name,
           qty: Number(it.qty),
           unit_price: Number(it.unit_price),
+          original_price: it.original_price ? Number(it.original_price) : null,
           tax_rate: Number(it.tax_rate || 0),
           line_total: Number(it.line_total)
         })),
@@ -437,7 +459,11 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
               {(invoice.items || []).length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4">No items found</p>
               ) : (
-                (invoice.items || []).map((item, i) => (
+                (invoice.items || []).map((item, i) => {
+                  const effPrice = Number(item.unit_price || 0);
+                  const origPrice = item.original_price ? Number(item.original_price) : effPrice;
+                  const hasDiscount = origPrice > effPrice;
+                  return (
                   <div key={i} className="bg-white rounded-xl px-4 py-3 flex items-center justify-between border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 font-bold text-sm flex-shrink-0">
@@ -445,18 +471,35 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
                       </div>
                       <div>
                         <p className="font-bold text-slate-800 text-sm leading-tight">{item.product_name || item.name || "Unknown Item"}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          ₹{Number(item.unit_price || 0).toFixed(2)} × {item.qty}
-                          {Number(item.tax_rate) > 0 && <span className="ml-2 text-amber-600">+{item.tax_rate}% tax</span>}
-                        </p>
+                        <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          {hasDiscount ? (
+                            <>
+                               <span className="line-through text-[10px]">₹{origPrice.toFixed(2)}</span>
+                               <span className="font-bold text-indigo-600">₹{effPrice.toFixed(2)}</span>
+                            </>
+                          ) : (
+                            <span>₹{effPrice.toFixed(2)}</span>
+                          )}
+                          <span>× {item.qty}</span>
+                          {Number(item.tax_rate) > 0 && <span className="text-amber-600">+{item.tax_rate}% tax</span>}
+                        </div>
                         {item.oversold && (
                           <p className="text-[9px] text-red-500 font-bold uppercase mt-1">⚠ Low Stock Sold</p>
                         )}
                       </div>
                     </div>
-                    <p className="font-bold text-slate-900 text-sm">{formatCurrency(Number(item.qty) * Number(item.unit_price))}</p>
+                    <div className="text-right">
+                       {hasDiscount && (
+                         <p className="text-[10px] text-slate-400 line-through mb-0.5">
+                           {formatCurrency(Number(item.qty) * origPrice)}
+                         </p>
+                       )}
+                       <p className="font-bold text-slate-900 text-sm">
+                         {formatCurrency(Number(item.qty) * effPrice)}
+                       </p>
+                    </div>
                   </div>
-                ))
+                )})
               )}
             </div>
           </div>
