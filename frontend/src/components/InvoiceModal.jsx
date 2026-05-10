@@ -343,6 +343,7 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
       state: { 
         editMode: true,
         invoiceId: invoice.id,
+        invoiceType: invoice.invoice_type || "INVOICE",
         initialCart: (invoice.items || []).map(it => ({
           product: it.product,
           product_name: it.product_name,
@@ -376,9 +377,16 @@ export default function InvoiceModal({ invoice, shop, onClose, onUpdate }) {
               <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">
                 {invoice.invoice_type || "Invoice"} #{invoice.number || invoice.id}
               </p>
-              <h2 className={`text-3xl font-black leading-none ${invoice.invoice_type === "QUOTATION" ? "text-amber-400" : "text-white"}`}>
-                {formatCurrency(invoice.grand_total)}
-              </h2>
+              <div className="flex items-end gap-2">
+                <h2 className={`text-3xl font-black leading-none ${invoice.invoice_type === "QUOTATION" ? "text-amber-400" : "text-white"}`}>
+                  {formatCurrency(invoice.grand_total)}
+                </h2>
+                {invoice.invoice_type === "QUOTATION" && Number(invoice.discount_total) > 0 && (
+                  <span className="text-lg text-slate-400/70 font-bold line-through mb-0.5">
+                    {formatCurrency(Number(invoice.grand_total) + Number(invoice.discount_total))}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-1.5">
               <button

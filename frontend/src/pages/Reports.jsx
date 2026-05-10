@@ -269,7 +269,7 @@ export default function Reports() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pb-10">
                         {filteredData.map((item, i) => {
-                            const displayName = tab === "sales" ? (item.customer_detail?.name || item.customer_name || "Walk-in") : item.name;
+                            const displayName = (tab === "sales" || tab === "quotations") ? (item.customer_detail?.name || item.customer_name || "Walk-in") : item.name;
                             const initial = displayName ? displayName.charAt(0).toUpperCase() : "#";
                             return (
                                 <div
@@ -291,9 +291,14 @@ export default function Reports() {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="text-right flex-shrink-0 ml-3">
+                                    <div className="text-right flex-shrink-0 ml-3 flex flex-col items-end">
+                                        {tab === "quotations" && Number(item.discount_total) > 0 && (
+                                            <span className="text-[10px] text-slate-400 line-through font-bold mb-0.5">
+                                                {formatCurrency(Number(item.grand_total) + Number(item.discount_total))}
+                                            </span>
+                                        )}
                                         <p className="font-bold text-slate-800 text-sm">
-                                            {tab === "sales" ? formatCurrency(item.grand_total) : tab === "stock" ? `${item.quantity} units` : formatCurrency(item.qty * item.price)}
+                                            {(tab === "sales" || tab === "quotations") ? formatCurrency(item.grand_total) : tab === "stock" ? `${item.quantity} units` : formatCurrency(item.qty * item.price)}
                                         </p>
                                         {tab === "stock" && Number(item.quantity) <= 5 && <span className="inline-block mt-1 text-[9px] font-bold text-white bg-red-600 px-2 py-0.5 rounded">LOW</span>}
                                         {tab === "products" && i === 0 && <span className="inline-block mt-1 text-[9px] font-bold text-white bg-cyan-700 px-2 py-0.5 rounded">#1</span>}
