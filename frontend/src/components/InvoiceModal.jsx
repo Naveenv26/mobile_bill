@@ -232,7 +232,11 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
   // INVOICE / QUOTATION label on right, just above the line
   const isQuote = invoice.invoice_type === 'QUOTATION';
   doc.setFontSize(20); doc.setFont("helvetica", "bold"); 
-  doc.setTextColor(isQuote ? [245, 158, 11] : [40, 40, 40]);
+  if (isQuote) {
+    doc.setTextColor(245, 158, 11);
+  } else {
+    doc.setTextColor(40, 40, 40);
+  }
   doc.text(isQuote ? "QUOTATION" : "INVOICE", pageW - margin, lineY - 5, { align: "right" });
 
   // Bill To + invoice meta
