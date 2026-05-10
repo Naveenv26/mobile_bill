@@ -146,16 +146,20 @@ const buildThermalDoc = (invoice, shop, logoBase64 = null) => {
     columnStyles: { 0: { cellWidth: 25, halign: "left" }, 1: { cellWidth: 10, halign: "center" }, 2: { cellWidth: 17, halign: "right" }, 3: { cellWidth: 18, halign: "right" } },
     margin: { left: lx, right: lx },
     didDrawCell: function(data) {
-        if (data.section === 'body' && (data.column.index === 2 || data.column.index === 3)) {
-            if (data.cell.text && data.cell.text.length > 1) {
-                const text = data.cell.text[0];
-                const y = data.cell.y + 2.5; 
-                const w = doc.getTextWidth(text);
-                const x = data.cell.x + data.cell.width - 1.5 - w;
-                doc.setDrawColor(200, 50, 50);
-                doc.setLineWidth(0.3);
-                doc.line(x, y, x + w, y);
+        try {
+            if (data.section === 'body' && (data.column.index === 2 || data.column.index === 3)) {
+                if (Array.isArray(data.cell.text) && data.cell.text.length > 1) {
+                    const text = data.cell.text[0];
+                    const y = data.cell.y + 2.5; 
+                    const w = doc.getTextWidth(text);
+                    const x = data.cell.x + data.cell.width - 1.5 - w;
+                    doc.setDrawColor(200, 50, 50);
+                    doc.setLineWidth(0.3);
+                    doc.line(x, y, x + w, y);
+                }
             }
+        } catch (e) {
+            console.error("Thermal didDrawCell error", e);
         }
     }
   });
@@ -271,15 +275,19 @@ const buildA4Doc = (invoice, shop, logoBase64 = null) => {
     alternateRowStyles: { fillColor: [248, 250, 252] },
     margin: { left: margin, right: margin },
     didDrawCell: function(data) {
-      if (data.section === 'body' && (data.column.index === 2 || data.column.index === 5)) {
-        if (data.cell.text && data.cell.text.length > 1) {
-          const text = data.cell.text[0];
-          const y = data.cell.y + 4;
-          const w = doc.getTextWidth(text);
-          doc.setDrawColor(200, 50, 50);
-          doc.setLineWidth(0.5);
-          doc.line(data.cell.x + 2, y, data.cell.x + 2 + w, y);
+      try {
+        if (data.section === 'body' && (data.column.index === 2 || data.column.index === 5)) {
+          if (Array.isArray(data.cell.text) && data.cell.text.length > 1) {
+            const text = data.cell.text[0];
+            const y = data.cell.y + 4;
+            const w = doc.getTextWidth(text);
+            doc.setDrawColor(200, 50, 50);
+            doc.setLineWidth(0.5);
+            doc.line(data.cell.x + 2, y, data.cell.x + 2 + w, y);
+          }
         }
+      } catch (e) {
+        console.error("A4 didDrawCell error", e);
       }
     }
   });

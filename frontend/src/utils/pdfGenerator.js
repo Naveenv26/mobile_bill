@@ -149,16 +149,20 @@ export const generateThermalPDF = async (printData, currentShop) => {
         },
         margin: { left: lx, right: lx },
         didDrawCell: function(data) {
-            if (data.section === 'body' && (data.column.index === 2 || data.column.index === 3)) {
-                if (data.cell.text && data.cell.text.length > 1) {
-                    const text = data.cell.text[0];
-                    const y = data.cell.y + 2.5; 
-                    const w = doc.getTextWidth(text);
-                    const x = data.cell.x + data.cell.width - 1.5 - w;
-                    doc.setDrawColor(200, 50, 50);
-                    doc.setLineWidth(0.3);
-                    doc.line(x, y, x + w, y);
+            try {
+                if (data.section === 'body' && (data.column.index === 2 || data.column.index === 3)) {
+                    if (Array.isArray(data.cell.text) && data.cell.text.length > 1) {
+                        const text = data.cell.text[0];
+                        const y = data.cell.y + 2.5; 
+                        const w = doc.getTextWidth(text);
+                        const x = data.cell.x + data.cell.width - 1.5 - w;
+                        doc.setDrawColor(200, 50, 50);
+                        doc.setLineWidth(0.3);
+                        doc.line(x, y, x + w, y);
+                    }
                 }
+            } catch (e) {
+                console.error("Thermal didDrawCell error", e);
             }
         }
     });
